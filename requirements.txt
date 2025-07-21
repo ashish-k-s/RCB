@@ -1,0 +1,8 @@
+streamlit
+langchain_openai
+dotenv
+langchain-community
+langchain-ollama
+langserve
+fastapi
+uvicorn
