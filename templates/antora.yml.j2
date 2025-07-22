@@ -1,0 +1,11 @@
+name: {{ repo_name }}
+title: {{ course_title }}
+version: {{ version }}
+nav:
+- modules/ROOT/nav.adoc
+- modules/LABENV/nav.adoc
+{% for chapter in chapters %}
+- modules/{{ chapter }}/nav.adoc
+{% endfor %}
+- modules/appendix/nav.adoc
+
