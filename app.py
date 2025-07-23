@@ -15,9 +15,11 @@ from pathlib import Path
 
 response = ""
 outline = ""
+topic = ""
 course_outline_file = "TEMP-outline.adoc"
 course_structure_file_names = "TEMP-course_structure_file_names.csv"
-prompt_course_outline = """
+
+system_prompt_course_outline = """
 You are a Course Designer expert in understanding the requirements of the curriculum and developing the course outline.
 **You always write the course outline in AsciiDoc-formatted text inside a code block.**
 Your job is **not** to write the course content. You follow the below rules to write course outline:
@@ -40,13 +42,75 @@ Your job is **not** to write the course content. You follow the below rules to w
     - Do not include any introductory or closing text in your response.
 """
 
-prompt_page_summary = """
+user_prompt_course_outline = """
+        Here are the list of objectives for which course outline is to be created: 
+        {objectives}
+"""
+
+system_prompt_page_summary = """
+You are a Content Developer, expert in providing short description for any given topic.
+Your task is to provide short explanation of provided topic.
+
+ **You always write content in Antora AsciiDoc format and present it in a code block for ease of copying the output and storing it in ".adoc" file.**
+
+Your responsibilities include:
+- Simplifying complex technical concepts into accessible explanations
+- Writing clear, concise, and short technical explanation on provided topic.
+
+Use the provided context as your primary knowledge base. Reference it where appropriate to ensure accuracy and continuity.
+
+You are currently assigned to work on the training content covering the below mentioned objectives:
+
+{outline}
 
 """
 
-prompt_detailed_content = """
+user_prompt_page_summary = """
+Keeping the whole list of objectives tobe covered in mind, write short description (one paragraph) for the below topic:
+
+{topic}
+
+Stick to this mentioned topic in your response.
 
 """
+system_prompt_detailed_content = """
+You are a Content Architect, combining the roles of Technical Writer and Subject Matter Expert. Your mission is to develop high-quality detailed educational content that is technically accurate, engaging, inclusive, and adaptable for different learning levels. **You always write content in Antora AsciiDoc format and present it in a code block for ease of copying the output and storing it in ".adoc" file.**
+
+Your responsibilities include:
+- Simplifying complex technical concepts into accessible explanations
+- Writing clear, concise, and engaging content for diverse audiences
+- Developing practical hands-on lab activities with real-world examples
+- Providing expert-level insights and troubleshooting guidance
+
+When drafting content, always:
+
+1. Write **detailed technical explanation**
+2. Incorporate step-by-step **hands-on activities** where applicable
+
+Use the provided context as your primary knowledge base. Reference it where appropriate to ensure accuracy and continuity.
+
+You are currently assigned to work on the training content covering the below mentioned objectives:
+
+{outline}
+
+"""
+
+user_prompt_detailed_content = """
+Keeping the whole list of objectives tobe covered in mind, write content for the below topic:
+
+{topic}
+
+Stick to the mentioned topic in your response.
+"""
+
+def build_prompt(system_prompt: str, user_prompt:str):
+    return ChatPromptTemplate.from_messages(
+        [
+            ("system", system_prompt),
+            ("user", user_prompt)
+
+        ]
+    )
 
 # --- Configuration for jinja2 file to generate antora.yml---
 antora_template_dir = './templates'          # folder where antora.yml.j2 is stored
@@ -85,13 +149,36 @@ def read_chapter_list(antora_csv_file):
                     with open(section_path_nav, 'a') as f:
                         f.write(f"* xref:{chapter_name}.adoc[]"+'\n')
                     with open(section_path_page, 'a') as f:
-                        f.write(f"# {row[0]}")
+                        text = re.sub(r'(==|-)', '', row[0], count=1)
+                        f.write(f"# {text}")
+
+                        ## Build prompt and call llm to generate page summary
+                        prompt = build_prompt(system_prompt_page_summary, user_prompt_page_summary)
+                        print("BUILDING PAGE SUMMARY")
+                        print("prompt: ", prompt)
+                        chain = prompt | llm | output_parser
+                        response = chain.invoke({"outline": outline, "topic": text})
+                        print("PAGE SUMMARY: ", response)
+                        #st.write(response)
+                        text = extract_code_blocks(response)
+                        f.write(f"\n\n{text}")
 
                 if row and row[0].strip().startswith('-') and len(row) > 1:
                     section_name = row[1].strip()
                     page_section_adoc = f"modules/{chapter_name}/pages/{section_name}.adoc"
-                    with open(page_section_adoc, 'w') as f:
-                        f.write(f"# {row[0]}")
+                    with open(page_section_adoc, 'a') as f:
+                        text = re.sub(r'(==|-)', '', row[0], count=1)
+                        f.write(f"# {text}")
+                        ## Build prompt and call llm to generate page content
+                        prompt = build_prompt(system_prompt_detailed_content, user_prompt_detailed_content)
+                        print("BUILDING PAGE CONTENT")
+                        print("prompt: ", prompt)
+                        chain = prompt | llm | output_parser
+                        response = chain.invoke({"outline": outline, "topic": text})
+                        print("PAGE CONTENT: ", response)
+                        #st.write(response)
+                        text = extract_code_blocks(response)
+                        f.write(f"\n\n{text}")
 
                     with open(section_path_nav, 'a') as f:
                         f.write(f"** xref:{section_name}.adoc[]"+'\n')
@@ -168,32 +255,19 @@ load_dotenv()
 os.environ["LANGCHAIN_TRACING_V2"] = "true"
 os.environ["LANGCHAIN_API_KEY"] = os.getenv("LANGCHAIN_API_KEY")
 
-prompt = ChatPromptTemplate.from_messages(
-    [
-        ("system", prompt_course_outline),
-        ("user", """
-        Here are the list of objectives for which course outline is to be created: 
-        {objectives}
-        """)
-
-    ]
-)
-
 ## streamlit framework
-
 st.title("Rapid Course Builder (RCB)")
 text_input = st.chat_input("Enter the list of training objectives:")
 
-## ollama llama3
+## Ollama model to generate response
 llm = Ollama(model="granite3.3:8b")
 output_parser = StrOutputParser()
 
-
-print("prompt: ", prompt)
-
-logger.info(f"PROMPT: {prompt}")
-
+## Build prompt to generate course outline
+prompt = build_prompt(system_prompt_course_outline, user_prompt_course_outline)
 chain = prompt | llm | output_parser
+print("prompt: ", prompt)
+logger.info(f"PROMPT: {prompt}")
 
 if text_input:
     response = chain.invoke({"objectives": text_input})
