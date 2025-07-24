@@ -22,6 +22,7 @@ course_structure_file_names = "TEMP-course_structure_file_names.csv"
 system_prompt_course_outline = """
 You are a Course Designer expert in understanding the requirements of the curriculum and developing the course outline.
 **You always write the course outline in AsciiDoc-formatted text inside a code block.**
+
 Your job is **not** to write the course content. You follow the below rules to write course outline:
     - Refer to the provided list of course objectives and available context.
     - Curate the text in provided objectives.
@@ -33,14 +34,14 @@ Your job is **not** to write the course content. You follow the below rules to w
     - Respond with the curated list of objectives and sub-topics to be covered under each of the objectives.
     - Provide the output in a codeblock in AsciiDoc (.adoc) format.
     - **Always** use the below AsciiDoc syntax:
-        - Heading H1 with symbol "=" for course heading
-        - Heading H2 with symbol "==" for topic
-        - Bullet with symbol "-" for sub-topic
+        - For course heading, use asciidoc Heading H1 with symbol "="
+        - For topic, use asciidoc Heading H2 with symbol "=="
+        - For sub-topic, use asciidoc Bullet with symbol "-"
     - Do not pre-fix "Objective" or "Module" or "Chapter" or any other such string in the generated output.
     - Do not number the topics, or add underline or any other decorations.
-    - Provide topics and sub-topics in the form of bullets and sub-bullets.
     - Do not include any introductory or closing text in your response.
 """
+#    - Provide topics and sub-topics in the form of bullets and sub-bullets.
 
 user_prompt_course_outline = """
         Here are the list of objectives for which course outline is to be created: 
@@ -51,11 +52,12 @@ system_prompt_page_summary = """
 You are a Content Developer, expert in providing short description for any given topic.
 Your task is to provide short explanation of provided topic.
 
- **You always write content in Antora AsciiDoc format and present it in a code block for ease of copying the output and storing it in ".adoc" file.**
+ **You always write content in Antora AsciiDoc format.**
 
 Your responsibilities include:
 - Simplifying complex technical concepts into accessible explanations
 - Writing clear, concise, and short technical explanation on provided topic.
+- Do not include any introductory or closing text in your response.
 
 Use the provided context as your primary knowledge base. Reference it where appropriate to ensure accuracy and continuity.
 
@@ -74,7 +76,9 @@ Stick to this mentioned topic in your response.
 
 """
 system_prompt_detailed_content = """
-You are a Content Architect, combining the roles of Technical Writer and Subject Matter Expert. Your mission is to develop high-quality detailed educational content that is technically accurate, engaging, inclusive, and adaptable for different learning levels. **You always write content in Antora AsciiDoc format and present it in a code block for ease of copying the output and storing it in ".adoc" file.**
+You are a Content Architect, combining the roles of Technical Writer and Subject Matter Expert. 
+Your mission is to develop high-quality detailed educational content that is technically accurate, engaging, inclusive, and adaptable for different learning levels. 
+**You always write content in Antora AsciiDoc format.**
 
 Your responsibilities include:
 - Simplifying complex technical concepts into accessible explanations
@@ -159,9 +163,12 @@ def read_chapter_list(antora_csv_file):
                         chain = prompt | llm | output_parser
                         response = chain.invoke({"outline": outline, "topic": text})
                         print("PAGE SUMMARY: ", response)
-                        #st.write(response)
-                        text = extract_code_blocks(response)
-                        f.write(f"\n\n{text}")
+                        st.write(response)
+                        f.write("\n\n")
+                        f.write(response)
+                        # text = extract_code_blocks(response)
+                        # print("CODEBLOCK SUMMARY: ", text)
+                        # f.write(f"\n\n{text}")
 
                 if row and row[0].strip().startswith('-') and len(row) > 1:
                     section_name = row[1].strip()
@@ -176,9 +183,12 @@ def read_chapter_list(antora_csv_file):
                         chain = prompt | llm | output_parser
                         response = chain.invoke({"outline": outline, "topic": text})
                         print("PAGE CONTENT: ", response)
-                        #st.write(response)
-                        text = extract_code_blocks(response)
-                        f.write(f"\n\n{text}")
+                        st.write(response)
+                        f.write("\n\n")
+                        f.write(response)
+                        # text = extract_code_blocks(response)
+                        # print("CODEBLOCK CONTENT: ", text)
+                        # f.write(f"\n\n{text}")
 
                     with open(section_path_nav, 'a') as f:
                         f.write(f"** xref:{section_name}.adoc[]"+'\n')
