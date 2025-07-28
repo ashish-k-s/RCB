@@ -33,22 +33,25 @@ You are a Course Designer expert in understanding the requirements of the curric
 **You always write the course outline in AsciiDoc-formatted text inside a code block.**
 
 Your job is **not** to write the course content. You follow the below rules to write course outline:
-    - Refer to the provided list of course objectives and available context.
-    - Curate the text in provided objectives.
-    - Derive the sub-topics to be covered to fulfil the provided list of objectives.
-    - **Always Restrict the structure to have only one level of sub-topics.**
-    - **Derive heading for the course.**
-    - Separate the layout to different topic and sub-topic as necessary.
-    - **Include the section for hands-on lab when it is required.**
     - Respond with the curated list of objectives and sub-topics to be covered under each of the objectives.
     - Provide the output in a codeblock in AsciiDoc (.adoc) format.
-    - **Always** use the below AsciiDoc syntax:
+    - **Always** use the below AsciiDoc **syntax**:
         - For course heading, use asciidoc Heading H1 with symbol "="
         - For topic, use asciidoc Heading H2 with symbol "=="
         - For sub-topic, use asciidoc Bullet with symbol "-"
+    - **Only modify the the provided list of objectives if they are not in the expected syntax.**
+    - If the provided list of objectives are in the **expected syntax*, **use them as is** without any modifications.
+    - **Always Restrict the structure to have only one level of sub-topics.**
+    - **Derive heading for the course.**
+    - Separate the layout to different topic and sub-topic as necessary.
+    - **Include the section for hands-on lab only when it is required.**
     - Do not pre-fix "Objective" or "Module" or "Chapter" or any other such string in the generated output.
     - Do not number the topics, or add underline or any other decorations.
     - Do not include any introductory or closing text in your response.
+    - Refer to the provided list of course objectives and available context.
+    - Curate the text in provided objectives.
+    - Derive the sub-topics to be covered to fulfil the provided list of objectives.
+
 """
 #    - Provide topics and sub-topics in the form of bullets and sub-bullets.
 
@@ -134,13 +137,6 @@ def build_prompt(system_prompt: str, user_prompt:str):
         ]
     )
 
-# --- Configuration for jinja2 file to generate antora.yml---
-antora_template_dir = './templates'          # folder where antora.yml.j2 is stored
-antora_output_file = 'antora.yml'            # output location
-antora_csv_file = course_structure_file_names
-antora_repo_name = 'sample-repo-name' # Get this from user input
-antora_course_title = 'Sample Course Title' # Use the course heading fron csv file
-antora_course_version = '1'
 
 # --- Page layout configuration ---
 st.set_page_config(
@@ -172,7 +168,19 @@ if 'repo_dir' not in st.session_state:
     st.session_state.repo_dir = "" 
 if 'repo_cloned' not in st.session_state:
     st.session_state.repo_cloned = False
-    
+
+# --- Configuration for jinja2 file to generate antora.yml---
+antora_template_dir = './templates'          # folder where antora.yml.j2 is stored
+antora_output_file = 'antora.yml'            # output location
+antora_playbook_file = 'antora-playbook.yml'
+antora_csv_file = course_structure_file_names
+if st.session_state.repo_name:
+    antora_repo_name = st.session_state.repo_name
+    print(f"DEBUG: Assigned repo name: {antora_repo_name}")
+    print(f"DEBUG: Using repo name from session state: {st.session_state.repo_name}")
+antora_course_title = 'Sample Course Title' # Use the course heading fron csv file
+antora_course_version = '1'
+
 # --- GitHub configuration ---
 # Ensure these environment variables are set in your .env file or system environment
 load_dotenv()
@@ -267,6 +275,9 @@ def generate_antora_yml():
     env = Environment(loader=FileSystemLoader(antora_template_dir))
     template = env.get_template('antora.yml.j2')
 
+
+    # print(f"==== antora_repo_name: {antora_repo_name}")
+    print(f"==== st.session_state.repo_name: {st.session_state.repo_name}")
     rendered = template.render(
         repo_name=antora_repo_name,
         course_title=antora_course_title,
@@ -438,6 +449,9 @@ with st.sidebar:
         help="Enter the name of the GitHub repository"
     )
 
+    if not st.session_state.repo_name:
+        st.session_state.repo_name = repo_name.strip()
+
     # Repos setup button
     if st.button("Setup Repository", disabled=not repo_name.strip()):
         with st.spinner("Setting up repository..."):
@@ -555,6 +569,7 @@ if not st.session_state.show_logs: # Hide chat interface if logs are shown
                 # Display response
                 if st.session_state.chat_response:
                     st.subheader("🤖 Response:")
+                    
                     st.write(st.session_state.chat_response)
                     print(response)
                     outline = extract_code_blocks(response)

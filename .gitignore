@@ -4,5 +4,6 @@ __pycache__/
 .Python
 .env
 .venv/
+venv
 TEMP-*
 *.bkp

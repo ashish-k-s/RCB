@@ -6,3 +6,4 @@ langchain-ollama
 langserve
 fastapi
 uvicorn
+PyGithub
