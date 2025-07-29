@@ -168,17 +168,21 @@ if 'repo_dir' not in st.session_state:
     st.session_state.repo_dir = "" 
 if 'repo_cloned' not in st.session_state:
     st.session_state.repo_cloned = False
+if 'antora_course_title' not in st.session_state:
+    st.session_state.antora_course_title = ""
 
 # --- Configuration for jinja2 file to generate antora.yml---
 antora_template_dir = './templates'          # folder where antora.yml.j2 is stored
 antora_output_file = 'antora.yml'            # output location
-antora_playbook_file = 'antora-playbook.yml'
+antora_pb_file = 'antora-playbook.yml'
 antora_csv_file = course_structure_file_names
 if st.session_state.repo_name:
     antora_repo_name = st.session_state.repo_name
     print(f"DEBUG: Assigned repo name: {antora_repo_name}")
     print(f"DEBUG: Using repo name from session state: {st.session_state.repo_name}")
-antora_course_title = 'Sample Course Title' # Use the course heading fron csv file
+#antora_course_title = 'Sample Course Title' # Use the course heading fron csv file
+if st.session_state.antora_course_title:
+    antora_course_title = st.session_state.antora_course_title
 antora_course_version = '1'
 
 # --- GitHub configuration ---
@@ -202,6 +206,12 @@ def read_chapter_list(antora_csv_file):
         with open(antora_csv_file, newline='', encoding='utf-8') as f:
             reader = csv.reader(f)
             for row in reader:
+                if row and row[0].strip().startswith('=') and len(row) > 1:
+                    antora_course_title = row[0].strip()
+                    if not st.session_state.antora_course_title:
+                        st.session_state.antora_course_title = antora_course_title
+                    print(f"DEBUG: antora_course_title: {antora_course_title}")
+                    print(f"DEBUG: st.session_state.antora_course_title: {st.session_state.antora_course_title}")
                 if row and row[0].strip().startswith('==') and len(row) > 1:
                     chapter_name = row[1].strip()
                     chapters.append(chapter_name)
@@ -274,7 +284,12 @@ def generate_antora_yml():
 
     env = Environment(loader=FileSystemLoader(antora_template_dir))
     template = env.get_template('antora.yml.j2')
+    template_pb = env.get_template('antora-playbook.yml.j2')
 
+    if st.session_state.antora_course_title:
+        antora_course_title = st.session_state.antora_course_title
+    print(f"DEBUG: Assigned repo name: {antora_repo_name}")
+    print(f"DEBUG: Using repo name from session state: {st.session_state.repo_name}")
 
     # print(f"==== antora_repo_name: {antora_repo_name}")
     print(f"==== st.session_state.repo_name: {st.session_state.repo_name}")
@@ -287,6 +302,14 @@ def generate_antora_yml():
 
     with open(antora_output_file, 'w') as f:
         f.write(rendered)
+
+    rendered_pb = template_pb.render(
+        repo_name=antora_repo_name,
+        course_title=antora_course_title,
+    )
+
+    with open(antora_pb_file, 'w') as f:
+        f.write(rendered_pb)
 
     print(f"{antora_output_file} generated with chapters: {chapters}")
 
@@ -308,6 +331,8 @@ def move_course_content_to_repo():
 
     # Move the course content files to the repository directory
     shutil.copy2("antora.yml",st.session_state.repo_dir)
+    shutil.copy2("antora-playbook.yml",st.session_state.repo_dir)
+
     dest_dir_modules = Path(st.session_state.repo_dir) / "modules"
     shutil.copytree("modules",dest_dir_modules,dirs_exist_ok=True)
 
