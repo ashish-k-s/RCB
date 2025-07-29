@@ -354,7 +354,9 @@ def push_to_github():
         repo.git.add(A=True)  # Add all changes
         repo.index.commit(COMMIT_MESSAGE)  # Commit changes
         origin = repo.remote(name='origin')
+        origin.pull()  # Pull latest changes from remote to avoid conflicts
         origin.push()  # Push changes to remote
+        time.sleep(5)  # Wait for a few seconds to ensure push is complete
         st.success("Changes pushed to GitHub successfully.")
     except Exception as e:
         st.error(f"Failed to push changes: {e}")
@@ -515,6 +517,7 @@ with st.sidebar:
                 # Create a temporary directory to clone the repository
                 with st.spinner("Cloning repository..."):
                     # Clone the repository to a temporary directory
+                    time.sleep(5)
                     if not st.session_state.repo_dir:
                         temp_dir = tempfile.mkdtemp()
                         st.session_state.repo_dir = f"{temp_dir}/{st.session_state.repo_name}"
