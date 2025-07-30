@@ -1,0 +1,11 @@
+#  Hands-on Lab
+
+Hands-on Lab:
+
+* A practical, interactive session designed for learners to apply theoretical knowledge.
+* Facilitates real-world experience with guided exercises and tasks.
+* Enables users to experiment in a controlled environment, minimizing risks.
+* Typically includes step-by-step instructions and pre-configured systems or software.
+* Encourages problem-solving and critical thinking skills.
+* Provides immediate feedback, enhancing learning retention and understanding.
+* Bridges the gap between classroom learning and professional application.

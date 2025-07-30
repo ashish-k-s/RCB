@@ -1,0 +1,112 @@
+#  Exercises covering installation, playbook creation, and configuration management
+
+**Exercise: Installation, Playbook Creation, and Configuration Management**
+
+In this exercise, you will gain hands-on experience with installing Ansible, creating a simple playbook for configuration management, and executing it on target systems. This practical activity is designed to familiarize you with the basic workflow of an Infrastructure as Code (IaC) tool.
+
+**Prerequisites:**
+
+1. A system (Linux or macOS recommended) with `git` installed for cloning the Ansible project repository.
+2. Basic understanding of command-line interfaces.
+3. An account on a cloud provider (e.g., AWS, Google Cloud, Azure) or local virtual machines for testing.
+
+**Step 1: Install Ansible**
+
+On your chosen system, install Ansible using the package manager. Here are commands for popular Linux distributions:
+
+- **Ubuntu/Debian:**
+
+  ```bash
+  sudo apt update
+  sudo apt install software-properties-common
+  sudo apt-add-repository --yes --update ppa:ansible/ansible
+  sudo apt install ansible
+  ```
+
+- **CentOS/RHEL:**
+
+  ```bash
+  sudo yum install epel-release
+  sudo yum install ansible
+  ```
+
+- **macOS (Brew):**
+
+  ```bash
+  brew install ansible
+  ```
+
+Verify the installation by checking Ansible's version:
+
+```bash
+ansible --version
+```
+
+**Step 2: Create a Simple Playbook**
+
+Create a new directory for your playbooks and navigate into it:
+
+```bash
+mkdir -p ~/ansible-playbooks/project_name
+cd ~/ansible-playbooks/project_name
+```
+
+Now, create a file named `site.yml` with the following content:
+
+```yaml
+---
+- hosts: webservers
+  become: yes
+  tasks:
+    - name: Ensure Apache is installed
+      apt:
+        name: apache2
+        state: present
+
+    - name: Start and enable Apache service
+      service:
+        name: apache2
+        state: started
+        enabled: yes
+```
+
+This playbook targets a group of hosts named `webservers`, installs the `apache2` package, and ensures that the Apache service is running and set to start at boot.
+
+**Step 3: Configure Inventories**
+
+Create an inventory file named `inventory` in the same directory with the following content:
+
+```ini
+[webservers]
+server1 ansible_host=<SERVER1_IP>  # Replace <SERVER1_IP> with your server's IP address or hostname
+
+[webservers:vars]
+ansible_user=your_username  # Replace 'your_username' with an appropriate user on the target servers
+```
+
+Replace `<SERVER1_IP>` and `your_username` with actual values relevant to your testing environment.
+
+**Step 4: Execute the Playbook**
+
+Run the playbook against your inventory:
+
+```bash
+ansible-playbook site.yml -i inventory
+```
+
+You should see output indicating that Apache is being installed and started on the specified target server(s).
+
+**Step 5: Validate Configuration**
+
+Access the webserver by navigating to `http://<SERVER1_IP>` in your browser or using `curl`:
+
+```bash
+curl http://<SERVER1_IP>
+```
+
+If you see the Apache default page, congratulations! You have successfully installed Ansible, created a basic playbook for configuration management, and executed it on target systems.
+
+**Additional Notes:**
+
+- For more advanced use cases, consider exploring Ansible roles, templates, and variables to enhance reusability and flexibility in your playbooks.
+- Always ensure you follow best practices for security when managing infrastructure with Ansible or similar tools, such as using SSH keys for authentication instead of passwords.

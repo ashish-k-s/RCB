@@ -80,11 +80,11 @@ You are currently assigned to work on the training content covering the below me
 """
 
 user_prompt_page_summary = """
-Keeping the whole list of objectives tobe covered in mind, write short description (not more than 7 sentences) for the below topic:
+Keeping the whole list of objectives tobe covered in mind, write short description (one paragraph) for the below topic:
 
 {topic}
 
-Stick to this mentioned topic in your response. If necessary, use Bullet points to list the key points.
+Stick to this mentioned topic in your response.
 
 """
 system_prompt_detailed_content = """
@@ -170,8 +170,6 @@ if 'repo_cloned' not in st.session_state:
     st.session_state.repo_cloned = False
 if 'antora_course_title' not in st.session_state:
     st.session_state.antora_course_title = ""
-if 'ai_prompt' not in st.session_state:
-    st.session_state.ai_prompt = ""
 
 # --- Configuration for jinja2 file to generate antora.yml---
 antora_template_dir = './templates'          # folder where antora.yml.j2 is stored
@@ -201,6 +199,7 @@ IS_PRIVATE = False
 # --- Read chapter list from CSV file ---
 def read_chapter_list(antora_csv_file):
     chapters = []
+    desc_chapters = []    
     sections = []
     chapter_name = ""
     section_name = ""
@@ -216,20 +215,28 @@ def read_chapter_list(antora_csv_file):
                     print(f"DEBUG: st.session_state.antora_course_title: {st.session_state.antora_course_title}")
                 if row and row[0].strip().startswith('==') and len(row) > 1:
                     chapter_name = row[1].strip()
+                    chapter_desc_str = row[0].strip()
                     chapters.append(chapter_name)
+                    desc_chapters.append(chapter_desc_str)
                     os.makedirs(f"modules/{chapter_name}", exist_ok=True)
                  
                     # Define the full file path for nav.adoc
                     section_path_nav = Path(f"modules/{chapter_name}/nav.adoc")
                     section_path_page = Path(f"modules/{chapter_name}/pages/{chapter_name}.adoc")
+                    root_path_nav = Path("modules/ROOT/nav.adoc")
+                    root_path_index = Path("modules/ROOT/pages/index.adoc")
 
                     # Create the parent directories if they don't exist
                     section_path_nav.parent.mkdir(parents=True, exist_ok=True)
                     section_path_page.parent.mkdir(parents=True, exist_ok=True)
+                    root_path_nav.parent.mkdir(parents=True, exist_ok=True)
 
                     # Create the empty file
                     section_path_nav.touch()
                     section_path_page.touch()
+                    root_path_nav.touch()
+                    root_path_index.touch()
+
                     with open(section_path_nav, 'a') as f:
                         f.write(f"* xref:{chapter_name}.adoc[]"+'\n')
                     with open(section_path_page, 'a') as f:
@@ -287,6 +294,7 @@ def generate_antora_yml():
     env = Environment(loader=FileSystemLoader(antora_template_dir))
     template = env.get_template('antora.yml.j2')
     template_pb = env.get_template('antora-playbook.yml.j2')
+    template_root_index = env.get_template('root_index.adoc.j2')
 
     if st.session_state.antora_course_title:
         antora_course_title = st.session_state.antora_course_title
@@ -313,7 +321,20 @@ def generate_antora_yml():
     with open(antora_pb_file, 'w') as f:
         f.write(rendered_pb)
 
+    rendered_root_index = template_root_index.render(
+        course_title=antora_course_title,
+        desc_chapters=desc_chapters
+    )
+
+    with open("modules/ROOT/pages/index.adoc", 'w') as f:
+        f.write(rendered_root_index)
+
+    # Create nav.adoc file in ROOT
+    with open("modules/ROOT/nav.adoc", "w") as file:
+        file.write("* xref:index.adoc[]\n")
+
     print(f"{antora_output_file} generated with chapters: {chapters}")
+    print(f"Topics covered in the training: {desc_chapters}")
 
 def move_course_content_to_repo():
     """
@@ -356,9 +377,7 @@ def push_to_github():
         repo.git.add(A=True)  # Add all changes
         repo.index.commit(COMMIT_MESSAGE)  # Commit changes
         origin = repo.remote(name='origin')
-        origin.pull()  # Pull latest changes from remote to avoid conflicts
         origin.push()  # Push changes to remote
-        time.sleep(5)  # Wait for a few seconds to ensure push is complete
         st.success("Changes pushed to GitHub successfully.")
     except Exception as e:
         st.error(f"Failed to push changes: {e}")
@@ -466,23 +485,6 @@ def convert_https_to_ssh(https_url: str) -> str:
     else:
         raise ValueError("Invalid GitHub HTTPS URL")
 
-def update_ai_prompt():
-    """
-    Update the ai_prompt session state variable when the text area content changes.
-    This function is called on change of the text area.
-    """
-    st.session_state.ai_prompt = st.session_state.get("ai_prompt", "")
-    print(f"DEBUG: Updated ai_prompt: {st.session_state.ai_prompt}")
-    # Debug info (remove this after testing)
-    st.write(f"Debug - ai_prompt length: {len(st.session_state.ai_prompt) if st.session_state.ai_prompt else 0}")
-    ai_prompt = st.text_area("AI generated topics:", 
-                        height=300,
-                        key="ai_prompt",on_change=update_ai_prompt)
-    print(f"DEBUG: st.session_state.ai_prompt {st.session_state.ai_prompt}")
-    st.rerun()
-
-
-
 # Sidebar on streamlit app
 with st.sidebar:
     # GitHub Repository Information
@@ -536,7 +538,6 @@ with st.sidebar:
                 # Create a temporary directory to clone the repository
                 with st.spinner("Cloning repository..."):
                     # Clone the repository to a temporary directory
-                    time.sleep(5)
                     if not st.session_state.repo_dir:
                         temp_dir = tempfile.mkdtemp()
                         st.session_state.repo_dir = f"{temp_dir}/{st.session_state.repo_name}"
@@ -594,7 +595,6 @@ if not st.session_state.show_logs: # Hide chat interface if logs are shown
             "Enter the list of training objectives to be covered:",
             placeholder="Type the training topics here...",
             height=300,
-            key="user_prompt",
             disabled=st.session_state.show_logs
         )
 
@@ -610,38 +610,28 @@ if not st.session_state.show_logs: # Hide chat interface if logs are shown
                 print("RESPONSE: \n", response)
                 # st.write(response)
                 st.session_state.chat_response = response
-                # Set the text area content directly
-                st.session_state.ai_prompt = response
                 # Add log entry
                 add_log(f"User: {user_prompt}")
                 add_log(f"LLM Response: {response}")
-                st.session_state.show_proceed_button = True
 
-        # Display response outside of button click handler so it persists
-        if st.session_state.chat_response:
-            st.subheader("🤖 Response:")
-            
-            #st.write(st.session_state.chat_response)
-            #print(response)
-            
-            ai_prompt = st.text_area("AI generated topics:", 
-                                    height=300,
-                                    key="ai_prompt",on_change=update_ai_prompt)
-            
+                # Display response
+                if st.session_state.chat_response:
+                    st.subheader("🤖 Response:")
+                    
+                    st.write(st.session_state.chat_response)
+                    print(response)
+                    outline = extract_code_blocks(response)
+
+                    ## Write course outline to an AsciiDoc file
+                    with open(course_outline_file, "w") as file:
+                        for line in outline:
+                            file.write(line + "\n")
+                st.session_state.show_proceed_button = True
 
 
         if st.session_state.show_proceed_button:
             if st.button("Proceed", disabled=st.session_state.show_logs):
                 st.write("Proceeding with the next steps...")
-
-                ## Extract code blocks from the current ai_promptcontent and write to file
-                print(f"DEBUG: st.session_state.ai_prompt {st.session_state.ai_prompt}")
-                outline = extract_code_blocks(st.session_state.ai_prompt)
-                
-                ## Write course outline to an AsciiDoc file
-                with open(course_outline_file, "w") as file:
-                    for line in outline:
-                        file.write(line + "\n")
 
                 ## START: Derive name of the files for course structure
 

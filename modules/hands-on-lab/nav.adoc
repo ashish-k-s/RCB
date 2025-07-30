@@ -1,0 +1,4 @@
+* xref:hands-on-lab.adoc[]
+** xref:setting-up-a-lab-environment-for-practice.adoc[]
+** xref:exercises-covering-installation-playbook-creation-and-configuration-management.adoc[]
+** xref:troubleshooting-common-issues-in-ansible-deployments.adoc[]

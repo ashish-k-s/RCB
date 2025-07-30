@@ -170,8 +170,8 @@ if 'repo_cloned' not in st.session_state:
     st.session_state.repo_cloned = False
 if 'antora_course_title' not in st.session_state:
     st.session_state.antora_course_title = ""
-if 'ai_prompt' not in st.session_state:
-    st.session_state.ai_prompt = ""
+if 'ai_content_editor' not in st.session_state:
+    st.session_state.ai_content_editor = ""
 
 # --- Configuration for jinja2 file to generate antora.yml---
 antora_template_dir = './templates'          # folder where antora.yml.j2 is stored
@@ -466,23 +466,6 @@ def convert_https_to_ssh(https_url: str) -> str:
     else:
         raise ValueError("Invalid GitHub HTTPS URL")
 
-def update_ai_prompt():
-    """
-    Update the ai_prompt session state variable when the text area content changes.
-    This function is called on change of the text area.
-    """
-    st.session_state.ai_prompt = st.session_state.get("ai_prompt", "")
-    print(f"DEBUG: Updated ai_prompt: {st.session_state.ai_prompt}")
-    # Debug info (remove this after testing)
-    st.write(f"Debug - ai_prompt length: {len(st.session_state.ai_prompt) if st.session_state.ai_prompt else 0}")
-    ai_prompt = st.text_area("AI generated topics:", 
-                        height=300,
-                        key="ai_prompt",on_change=update_ai_prompt)
-    print(f"DEBUG: st.session_state.ai_prompt {st.session_state.ai_prompt}")
-    st.rerun()
-
-
-
 # Sidebar on streamlit app
 with st.sidebar:
     # GitHub Repository Information
@@ -594,7 +577,6 @@ if not st.session_state.show_logs: # Hide chat interface if logs are shown
             "Enter the list of training objectives to be covered:",
             placeholder="Type the training topics here...",
             height=300,
-            key="user_prompt",
             disabled=st.session_state.show_logs
         )
 
@@ -611,7 +593,7 @@ if not st.session_state.show_logs: # Hide chat interface if logs are shown
                 # st.write(response)
                 st.session_state.chat_response = response
                 # Set the text area content directly
-                st.session_state.ai_prompt = response
+                st.session_state.ai_content_editor = response
                 # Add log entry
                 add_log(f"User: {user_prompt}")
                 add_log(f"LLM Response: {response}")
@@ -626,17 +608,19 @@ if not st.session_state.show_logs: # Hide chat interface if logs are shown
             
             ai_prompt = st.text_area("AI generated topics:", 
                                     height=300,
-                                    key="ai_prompt",on_change=update_ai_prompt)
+                                    key="ai_content_editor")
             
+            # Debug info (remove this after testing)
+            st.write(f"Debug - ai_prompt length: {len(ai_prompt) if ai_prompt else 0}")
+            st.write(f"Debug - ai_content_editor length: {len(st.session_state.ai_content_editor) if st.session_state.ai_content_editor else 0}")
 
 
         if st.session_state.show_proceed_button:
             if st.button("Proceed", disabled=st.session_state.show_logs):
                 st.write("Proceeding with the next steps...")
 
-                ## Extract code blocks from the current ai_promptcontent and write to file
-                print(f"DEBUG: st.session_state.ai_prompt {st.session_state.ai_prompt}")
-                outline = extract_code_blocks(st.session_state.ai_prompt)
+                ## Extract code blocks from the current ai_prompt content and write to file
+                outline = extract_code_blocks(st.session_state.ai_content_editor)
                 
                 ## Write course outline to an AsciiDoc file
                 with open(course_outline_file, "w") as file:

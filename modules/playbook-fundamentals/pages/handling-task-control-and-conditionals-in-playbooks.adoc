@@ -1,0 +1,102 @@
+#  Handling task control and conditionals in playbooks
+
+## Handling Task Control and Conditionals in Playbooks
+
+### Overview
+
+In Ansible, playbooks are written in the YAML format and serve as a configuration management tool. They define the desired system state using modules that can be applied to managed hosts. This content focuses on handling task control and conditionals within these playbooks, enabling more dynamic and adaptive automation tasks.
+
+### Task Control
+
+Ansible offers several mechanisms for controlling the execution flow of tasks in playbooks. Understanding these controls is essential for creating robust and efficient automation workflows.
+
+#### `when` Condition
+
+The `when` condition allows you to control which tasks are run based on specific criteria, such as variable values or outputs from other tasks. 
+
+**Syntax:**
+```yaml
+- name: Example task
+  ansible.builtin.debug:
+    msg: "Running this task"
+  when: some_variable | bool or another_variable is defined
+```
+In this example, the `debug` task runs only if `some_variable` is true or `another_variable` has been defined.
+
+#### `async`, `poll`, and `synchronize`
+
+Ansible provides mechanisms to run tasks asynchronously and wait for their completion with `async` and `poll`. For situations where you need to synchronize task execution, the `synchronize` keyword is helpful.
+
+**Asynchronous Task Execution:**
+```yaml
+- name: Run async task
+  ansible.builtin.command: sleep 10
+  async: 10
+  poll: 0
+
+- name: Gather results from async tasks
+  ansible.builtin.async_status:
+    jid: "{{ async_job_id }}"
+```
+In this example, the `sleep 10` command runs asynchronously, and subsequent tasks wait for its completion using `async_status`.
+
+#### `blocks` and `when` with Blocks
+
+You can group tasks into blocks and control their execution using conditions.
+
+**Example:**
+```yaml
+- name: Process files
+  hosts: all
+
+  vars:
+    file_exists: yes
+
+  roles:
+    - my_role
+
+  tasks:
+    - name: Check if the file exists
+      ansible.builtin.stat:
+        path: /path/to/file
+      register: file_info
+
+    - name: Process existing file
+      block:
+        - name: Perform action on existing file
+          ansible.builtin.debug:
+            msg: "File exists, processing..."
+      when: file_info.stat.exists
+
+    - name: Handle non-existing file
+      when: not file_info.stat.exists
+```
+In this playbook, tasks are executed based on whether the specified file exists or not.
+
+### Conditionals in Playbooks
+
+Ansible supports conditionals using Jinja2 templates, which allow dynamic content generation within playbooks and roles.
+
+**Example:**
+```yaml
+- name: Include tasks based on OS
+  include_tasks:
+    - "{{ ansible_distribution }}.yml"
+
+# os-specific.yml
+- name: Ubuntu specific task
+  ansible.builtin.apt:
+    name: <package-name>
+  when: ansible_os_family == "Debian"
+
+# RedHat-specific.yml
+- name: CentOS/RHEL specific task
+  ansible.builtin.yum:
+    name: <package-name>
+  when: ansible_os_family == "RedHat"
+```
+This playbook structure includes tasks based on the managed host's operating system, applying relevant package management commands for each OS family.
+
+### Conclusion
+
+Mastering task control and conditionals in Ansible playbooks empowers you to create flexible, reusable, and context-aware automation workflows. By leveraging `when` conditions, asynchronous tasks, blocks, and Jinja2 templating, you can craft sophisticated automation solutions tailored to diverse environments and requirements.
