@@ -22,6 +22,7 @@ import io
 from typing import List, Optional
 import shutil
 
+global response, topic
 response = ""
 outline = ""
 topic = ""
@@ -174,6 +175,8 @@ if 'desc_chapters' not in st.session_state:
     st.session_state.desc_chapters = []
 if 'ai_prompt' not in st.session_state:
     st.session_state.ai_prompt = ""
+if 'outline_str' not in st.session_state:
+    st.session_state.outline_str = ""
 
 # --- Configuration for jinja2 file to generate antora.yml---
 antora_template_dir = './templates'          # folder where antora.yml.j2 is stored
@@ -206,6 +209,8 @@ def read_chapter_list(antora_csv_file):
     sections = []
     chapter_name = ""
     section_name = ""
+    global system_prompt_page_summary, user_prompt_page_summary, system_prompt_detailed_content, user_prompt_detailed_content
+    
     try:
         with open(antora_csv_file, newline='', encoding='utf-8') as f:
             reader = csv.reader(f)
@@ -243,6 +248,9 @@ def read_chapter_list(antora_csv_file):
                     section_path_page.touch()
                     root_path_nav.touch()
                     root_path_index.touch()
+                    # outline_str = f"""{outline[0]}"""
+                    print("\n\nDEBUG: outline", outline)
+                    print("\n\nDEBUG: outline_str", st.session_state.outline_str)
 
                     with open(section_path_nav, 'a') as f:
                         f.write(f"* xref:{chapter_name}.adoc[]"+'\n')
@@ -251,7 +259,15 @@ def read_chapter_list(antora_csv_file):
                         f.write(f"# {text}")
 
                         ## Build prompt and call llm to generate page summary
-                        prompt = build_prompt(system_prompt_page_summary, user_prompt_page_summary)
+                        
+                        system_prompt_page_summary_full = system_prompt_page_summary.replace("{outline}", st.session_state.outline_str)
+                        user_prompt_page_summary_full = user_prompt_page_summary.replace("{topic}", text)
+                        print("DEBUG: 2: system_prompt_page_summary_full: ", system_prompt_page_summary_full)
+                        print("DEBUG: 2: user_prompt_page_summary_full: ", user_prompt_page_summary_full)
+
+
+                        ## Build prompt and call llm to generate page summary
+                        prompt = build_prompt(system_prompt_page_summary_full, user_prompt_page_summary_full)
                         print("BUILDING PAGE SUMMARY")
                         print("prompt: ", prompt)
                         chain = prompt | llm | output_parser
@@ -270,8 +286,14 @@ def read_chapter_list(antora_csv_file):
                     with open(page_section_adoc, 'a') as f:
                         text = re.sub(r'(==|-)', '', row[0], count=1)
                         f.write(f"# {text}")
+                        print(f"DEBUG: Topic text: {text}")
                         ## Build prompt and call llm to generate page content
-                        prompt = build_prompt(system_prompt_detailed_content, user_prompt_detailed_content)
+                        system_prompt_detailed_content_full = system_prompt_detailed_content.replace("{outline}", st.session_state.outline_str)
+                        user_prompt_detailed_content_full = user_prompt_detailed_content.replace("{topic}", text)
+                        print("DEBUG: 2: system_prompt_detailed_content_full: ", system_prompt_detailed_content_full)
+                        print("DEBUG: 2: user_prompt_detailed_content_full: ", user_prompt_detailed_content_full)
+
+                        prompt = build_prompt(system_prompt_detailed_content_full, user_prompt_detailed_content_full)
                         print("BUILDING PAGE CONTENT")
                         print("prompt: ", prompt)
                         chain = prompt | llm | output_parser
@@ -329,9 +351,16 @@ def generate_antora_yml():
     with open(antora_pb_file, 'w') as f:
         f.write(rendered_pb)
 
+    print(f"DEBUG: antora_course_title: >>>>>>>>>> {antora_course_title}")
+    print(f"DEBUG: st.session_state.antora_course_title: >>>>>>>>>> {st.session_state.antora_course_title}")
+    print(f"DEBUG: st.session_state.desc_chapters: >>>>>>>>>> {st.session_state.desc_chapters}")
+
+    title = st.session_state.antora_course_title.strip('=')
+    topics = [chapter_desc.strip('=') for chapter_desc in st.session_state.desc_chapters]
+
     rendered_root_index = template_root_index.render(
-        course_title=antora_course_title,
-        desc_chapters=st.session_state.desc_chapters
+        course_title=title,
+        desc_chapters=topics
     )
 
     with open("modules/ROOT/pages/index.adoc", 'w') as f:
@@ -510,7 +539,7 @@ def update_ai_prompt():
                         height=300,
                         key="ai_prompt",on_change=update_ai_prompt)
     print(f"DEBUG: st.session_state.ai_prompt {st.session_state.ai_prompt}")
-    st.rerun()
+    #st.rerun()
 
 
 
@@ -668,7 +697,10 @@ if not st.session_state.show_logs: # Hide chat interface if logs are shown
                 ## Extract code blocks from the current ai_promptcontent and write to file
                 print(f"DEBUG: st.session_state.ai_prompt {st.session_state.ai_prompt}")
                 outline = extract_code_blocks(st.session_state.ai_prompt)
-                
+                st.session_state.outline_str = f"""{outline[0]}"""
+                print(f"=====DEBUG: outline: {outline}")
+                print(f"=====DEBUG: outline_str: {st.session_state.outline_str}")
+
                 ## Write course outline to an AsciiDoc file
                 with open(course_outline_file, "w") as file:
                     for line in outline:
@@ -680,7 +712,7 @@ if not st.session_state.show_logs: # Hide chat interface if logs are shown
                 with open(course_outline_file, 'r', encoding='utf-8') as file:
                     outline_file_content = file.read()
 
-                print(outline_file_content)
+                print(f"DEBUG: outline_file_content: {outline_file_content}")
 
                 csv_output = multiline_to_csv(outline_file_content)
                 print(csv_output)
