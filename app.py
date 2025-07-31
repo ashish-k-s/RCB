@@ -170,6 +170,8 @@ if 'repo_cloned' not in st.session_state:
     st.session_state.repo_cloned = False
 if 'antora_course_title' not in st.session_state:
     st.session_state.antora_course_title = ""
+if 'desc_chapters' not in st.session_state:
+    st.session_state.desc_chapters = []
 if 'ai_prompt' not in st.session_state:
     st.session_state.ai_prompt = ""
 
@@ -217,19 +219,31 @@ def read_chapter_list(antora_csv_file):
                 if row and row[0].strip().startswith('==') and len(row) > 1:
                     chapter_name = row[1].strip()
                     chapters.append(chapter_name)
+                    chapter_desc_str = row[0].strip()
+                    st.session_state.desc_chapters.append(chapter_desc_str)
+
                     os.makedirs(f"modules/{chapter_name}", exist_ok=True)
                  
                     # Define the full file path for nav.adoc
                     section_path_nav = Path(f"modules/{chapter_name}/nav.adoc")
                     section_path_page = Path(f"modules/{chapter_name}/pages/{chapter_name}.adoc")
 
+                    root_path_nav = Path("modules/ROOT/nav.adoc")
+                    root_path_index = Path("modules/ROOT/pages/index.adoc")
+                    root_path_index.parent.mkdir(parents=True, exist_ok=True)     
+
                     # Create the parent directories if they don't exist
                     section_path_nav.parent.mkdir(parents=True, exist_ok=True)
                     section_path_page.parent.mkdir(parents=True, exist_ok=True)
 
+                    root_path_nav.parent.mkdir(parents=True, exist_ok=True)
+
                     # Create the empty file
                     section_path_nav.touch()
                     section_path_page.touch()
+                    root_path_nav.touch()
+                    root_path_index.touch()
+
                     with open(section_path_nav, 'a') as f:
                         f.write(f"* xref:{chapter_name}.adoc[]"+'\n')
                     with open(section_path_page, 'a') as f:
@@ -275,7 +289,7 @@ def read_chapter_list(antora_csv_file):
             
                 
     except FileNotFoundError:
-        print(f"CSV file '{csv_file}' not found.")
+        print(f"CSV file '{antora_csv_file}' not found.")
     return chapters
 
 
@@ -287,6 +301,8 @@ def generate_antora_yml():
     env = Environment(loader=FileSystemLoader(antora_template_dir))
     template = env.get_template('antora.yml.j2')
     template_pb = env.get_template('antora-playbook.yml.j2')
+    template_root_index = env.get_template('root-index.adoc.j2')
+
 
     if st.session_state.antora_course_title:
         antora_course_title = st.session_state.antora_course_title
@@ -313,7 +329,22 @@ def generate_antora_yml():
     with open(antora_pb_file, 'w') as f:
         f.write(rendered_pb)
 
+    rendered_root_index = template_root_index.render(
+        course_title=antora_course_title,
+        desc_chapters=st.session_state.desc_chapters
+    )
+
+    with open("modules/ROOT/pages/index.adoc", 'w') as f:
+        f.write(rendered_root_index)
+
+    # Create nav.adoc file in ROOT
+    with open("modules/ROOT/nav.adoc", "w") as file:
+        file.write("* xref:index.adoc[]\n")
+
+
     print(f"{antora_output_file} generated with chapters: {chapters}")
+    print(f"Topics covered in the training: {st.session_state.desc_chapters}")
+
 
 def move_course_content_to_repo():
     """
