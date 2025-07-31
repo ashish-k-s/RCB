@@ -1,3 +1,0 @@
-* xref:ansible-overview.adoc[]
-** xref:introduction-to-ansible.adoc[]
-** xref:ansible-architecture-and-components.adoc[]

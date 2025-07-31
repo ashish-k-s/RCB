@@ -1,4 +1,0 @@
-* xref:playbook-fundamentals.adoc[]
-** xref:writing-basic-ansible-playbooks.adoc[]
-** xref:using-ansible-modules-and-variables.adoc[]
-** xref:handling-task-control-and-conditionals-in-playbooks.adoc[]

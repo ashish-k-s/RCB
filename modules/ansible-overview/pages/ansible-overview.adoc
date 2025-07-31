@@ -1,9 +1,0 @@
-#  Ansible Overview
-
-Ansible is an open-source automation tool, or "configuration management" tool, used for software provisioning, application deployment, and task automation. It uses a simple language (YAML, in human-readable structure) called Ansible Playbooks to describe automation jobs in a way that approaches plain English. Key features include:
-
-- Agentless, meaning no requirement for additional software installation on managed nodes.
-- Uses SSH for communication, ensuring secure and reliable connections.
-- Emphasizes simplicity and ease of use, with a minimal learning curve.
-- Offers idempotency, ensuring that actions are repeated without causing unintended side effects.
-- Supports cross-platform and multi-vendor environments.
