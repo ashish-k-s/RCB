@@ -177,6 +177,8 @@ if 'ai_prompt' not in st.session_state:
     st.session_state.ai_prompt = ""
 if 'outline_str' not in st.session_state:
     st.session_state.outline_str = ""
+if 'progress_logs' not in st.session_state:
+    st.session_state.progress_logs = st.empty()
 
 # --- Configuration for jinja2 file to generate antora.yml---
 antora_template_dir = './templates'          # folder where antora.yml.j2 is stored
@@ -269,6 +271,7 @@ def read_chapter_list(antora_csv_file):
                         ## Build prompt and call llm to generate page summary
                         prompt = build_prompt(system_prompt_page_summary_full, user_prompt_page_summary_full)
                         print("BUILDING PAGE SUMMARY")
+                        st.session_state.progress_logs.info(f"Building page summary for topic: {text}")
                         print("prompt: ", prompt)
                         chain = prompt | llm | output_parser
                         response = chain.invoke({"outline": outline, "topic": text})
@@ -295,6 +298,7 @@ def read_chapter_list(antora_csv_file):
 
                         prompt = build_prompt(system_prompt_detailed_content_full, user_prompt_detailed_content_full)
                         print("BUILDING PAGE CONTENT")
+                        st.session_state.progress_logs.info(f"Building page content for topic: {text}")
                         print("prompt: ", prompt)
                         chain = prompt | llm | output_parser
                         response = chain.invoke({"outline": outline, "topic": text})
@@ -319,6 +323,7 @@ def read_chapter_list(antora_csv_file):
 # --- Render antora.yml template ---
 def generate_antora_yml():
     chapters = read_chapter_list(antora_csv_file)
+    st.session_state.progress_logs.info(f"Generating supporting files")
 
     env = Environment(loader=FileSystemLoader(antora_template_dir))
     template = env.get_template('antora.yml.j2')
@@ -327,7 +332,10 @@ def generate_antora_yml():
 
 
     if st.session_state.antora_course_title:
-        antora_course_title = st.session_state.antora_course_title
+        antora_course_title = st.session_state.antora_course_title.strip('=')
+
+    topics = [chapter_desc.strip('=') for chapter_desc in st.session_state.desc_chapters]
+
     print(f"DEBUG: Assigned repo name: {antora_repo_name}")
     print(f"DEBUG: Using repo name from session state: {st.session_state.repo_name}")
 
@@ -355,11 +363,9 @@ def generate_antora_yml():
     print(f"DEBUG: st.session_state.antora_course_title: >>>>>>>>>> {st.session_state.antora_course_title}")
     print(f"DEBUG: st.session_state.desc_chapters: >>>>>>>>>> {st.session_state.desc_chapters}")
 
-    title = st.session_state.antora_course_title.strip('=')
-    topics = [chapter_desc.strip('=') for chapter_desc in st.session_state.desc_chapters]
 
     rendered_root_index = template_root_index.render(
-        course_title=title,
+        course_title=antora_course_title,
         desc_chapters=topics
     )
 
@@ -402,6 +408,7 @@ def push_to_github():
     """
     Push the changes to the GitHub repository.
     """
+    st.session_state.progress_logs.info(f"Pushing changes to GitHub repository...")
     if not st.session_state.repo_dir:
         st.error("Repository directory is not set. Please verify the repository setup.")
         return
@@ -419,7 +426,8 @@ def push_to_github():
         origin.pull()  # Pull latest changes from remote to avoid conflicts
         origin.push()  # Push changes to remote
         time.sleep(5)  # Wait for a few seconds to ensure push is complete
-        st.success("Changes pushed to GitHub successfully.")
+        st.session_state.progress_logs.success(f"Changes pushed to GitHub repository '{st.session_state.repo_name}' successfully.")
+        print(f"Changes pushed to GitHub repository '{st.session_state.repo_name}' successfully.")
     except Exception as e:
         st.error(f"Failed to push changes: {e}")
 
@@ -581,8 +589,7 @@ with st.sidebar:
                     st.session_state.repo_verified = False
                     st.session_state.repo_url = ""
                     add_log(f"Failed to create repository '{repo_name}'. Please check the logs.")
-
-
+        
     # Show repository link if verified
     if st.session_state.repo_verified and st.session_state.repo_url:
         st.markdown(f"Repository URL: [View Repository]({st.session_state.repo_url})", unsafe_allow_html=True)
@@ -612,6 +619,15 @@ with st.sidebar:
             add_log(f"Error cloning repository '{st.session_state.repo_name}': {e}")
             st.session_state.repo_verified = False
             st.session_state.repo_url = ""  
+
+        # Show required structure for the course objectives
+        st.markdown("""
+        **Required Structure for Training Objectives:**
+                    
+        - Use `=` for course heading
+        - Use `==` for section headings
+        - Use `-` for topics under sections
+        """)
 
 
 
