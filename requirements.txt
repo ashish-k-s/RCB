@@ -3,6 +3,7 @@ langchain_openai
 dotenv
 langchain-community
 langchain-ollama
+langchain-chroma
 langserve
 fastapi
 uvicorn
