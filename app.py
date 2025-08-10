@@ -2,6 +2,15 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_community.llms import Ollama
+from langchain_community.document_loaders import PyPDFLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_ollama import OllamaEmbeddings
+from langchain_community.vectorstores import Chroma
+from langchain_ollama import OllamaEmbeddings
+from langchain_community.vectorstores import Chroma
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain.chains import create_retrieval_chain
+
 import streamlit as st
 import os
 from dotenv import load_dotenv
@@ -29,6 +38,8 @@ topic = ""
 course_outline_file = "TEMP-outline.adoc"
 course_structure_file_names = "TEMP-course_structure_file_names.csv"
 
+FILE_SIZE_MAX = 10
+
 system_prompt_course_outline = """
 You are a Course Designer expert in understanding the requirements of the curriculum and developing the course outline.
 **You always write the course outline in AsciiDoc-formatted text inside a code block.**
@@ -53,6 +64,8 @@ Your job is **not** to write the course content. You follow the below rules to w
     - Curate the text in provided objectives.
     - Derive the sub-topics to be covered to fulfil the provided list of objectives.
 
+Context:
+{context}
 """
 #    - Provide topics and sub-topics in the form of bullets and sub-bullets.
 
@@ -78,6 +91,8 @@ You are currently assigned to work on the training content covering the below me
 
 {outline}
 
+Relevant context:
+{context}
 """
 
 user_prompt_page_summary = """
@@ -110,6 +125,8 @@ You are currently assigned to work on the training content covering the below me
 
 {outline}
 
+Relevant context:
+{context}
 """
 
 user_prompt_detailed_content = """
@@ -179,6 +196,11 @@ if 'outline_str' not in st.session_state:
     st.session_state.outline_str = ""
 if 'progress_logs' not in st.session_state:
     st.session_state.progress_logs = st.empty()
+# RAG state
+if 'vectorstore' not in st.session_state:
+    st.session_state.vectorstore = None
+if 'retriever' not in st.session_state:
+    st.session_state.retriever = None
 
 # --- Configuration for jinja2 file to generate antora.yml---
 antora_template_dir = './templates'          # folder where antora.yml.j2 is stored
@@ -262,19 +284,16 @@ def read_chapter_list(antora_csv_file):
 
                         ## Build prompt and call llm to generate page summary
                         
-                        system_prompt_page_summary_full = system_prompt_page_summary.replace("{outline}", st.session_state.outline_str)
-                        user_prompt_page_summary_full = user_prompt_page_summary.replace("{topic}", text)
-                        print("DEBUG: 2: system_prompt_page_summary_full: ", system_prompt_page_summary_full)
-                        print("DEBUG: 2: user_prompt_page_summary_full: ", user_prompt_page_summary_full)
+                        # Retrieve RAG context for this chapter/topic
+                        context_text = retrieve_context(text)
 
-
-                        ## Build prompt and call llm to generate page summary
-                        prompt = build_prompt(system_prompt_page_summary_full, user_prompt_page_summary_full)
+                        # Build prompt with variables for outline/topic/context
+                        prompt = build_prompt(system_prompt_page_summary, user_prompt_page_summary)
                         print("BUILDING PAGE SUMMARY")
                         st.session_state.progress_logs.info(f"Building page summary for topic: {text}")
                         print("prompt: ", prompt)
                         chain = prompt | llm | output_parser
-                        response = chain.invoke({"outline": outline, "topic": text})
+                        response = chain.invoke({"outline": st.session_state.outline_str, "topic": text, "context": context_text})
                         print("PAGE SUMMARY: ", response)
                         ##st.write(response)
                         f.write("\n\n")
@@ -291,17 +310,16 @@ def read_chapter_list(antora_csv_file):
                         f.write(f"# {text}")
                         print(f"DEBUG: Topic text: {text}")
                         ## Build prompt and call llm to generate page content
-                        system_prompt_detailed_content_full = system_prompt_detailed_content.replace("{outline}", st.session_state.outline_str)
-                        user_prompt_detailed_content_full = user_prompt_detailed_content.replace("{topic}", text)
-                        print("DEBUG: 2: system_prompt_detailed_content_full: ", system_prompt_detailed_content_full)
-                        print("DEBUG: 2: user_prompt_detailed_content_full: ", user_prompt_detailed_content_full)
+                        # Retrieve RAG context for this section/topic
+                        context_text = retrieve_context(text)
 
-                        prompt = build_prompt(system_prompt_detailed_content_full, user_prompt_detailed_content_full)
+                        # Build prompt with variables for outline/topic/context
+                        prompt = build_prompt(system_prompt_detailed_content, user_prompt_detailed_content)
                         print("BUILDING PAGE CONTENT")
                         st.session_state.progress_logs.info(f"Building page content for topic: {text}")
                         print("prompt: ", prompt)
                         chain = prompt | llm | output_parser
-                        response = chain.invoke({"outline": outline, "topic": text})
+                        response = chain.invoke({"outline": st.session_state.outline_str, "topic": text, "context": context_text})
                         print("PAGE CONTENT: ", response)
                         ##st.write(response)
                         f.write("\n\n")
@@ -549,10 +567,116 @@ def update_ai_prompt():
     print(f"DEBUG: st.session_state.ai_prompt {st.session_state.ai_prompt}")
     #st.rerun()
 
+def save_uploaded_file(uploaded_file) -> str:
+    ## Save an uploaded file to the uploads directory
+    if not os.path.exists("uploads"):
+        os.makedirs("uploads")
+
+    file_path = os.path.join("uploads/",uploaded_file.name)
+    with open(file_path, "wb") as f:
+        f.write(uploaded_file.getvalue())
+
+    return file_path
+
+# RAG: Build vector store and retriever per uploaded file, persisted on disk
+def process_file(file_path):
+    loader = PyPDFLoader(file_path)
+    document = loader.load()
+    
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    docs = text_splitter.split_documents(document)
+    
+    embeddings = OllamaEmbeddings(model="mxbai-embed-large")
+    persist_dir = str(Path("chroma").absolute())
+
+    # Initialize or update a single persistent vector store
+    if st.session_state.vectorstore is None:
+        db = Chroma.from_documents(docs, embedding=embeddings, persist_directory=persist_dir)
+        st.session_state.vectorstore = db
+    else:
+        st.session_state.vectorstore.add_documents(docs)
+    
+    # Persist changes
+    st.session_state.vectorstore.persist()
+
+    # Create/update retriever
+    st.session_state.retriever = st.session_state.vectorstore.as_retriever(search_kwargs={"k": 4})
+
+
+# Helper to get retrieved context as a single string
+def retrieve_context(query: str, max_tokens: int = 1500) -> str:
+    try:
+        if st.session_state.retriever is None or not query:
+            return ""
+        docs = st.session_state.retriever.get_relevant_documents(query)
+        # Concatenate contents; optionally truncate to keep prompts reasonable
+        combined = "\n\n".join(doc.page_content for doc in docs if getattr(doc, 'page_content', None))
+        # Rough truncation by characters (token proxy)
+        if len(combined) > max_tokens * 4:
+            combined = combined[: max_tokens * 4]
+        return combined
+    except Exception as e:
+        print(f"RAG retrieval failed: {e}")
+        return ""
+
+
+def process_uploaded_documents(uploaded_files):
+    if not uploaded_files:
+        return
+    
+    total_files = len(uploaded_files)
+    progress_bar = st.progress(0)
+    status_placeholder = st.empty()
+
+    processed_files = 0
+    
+    try:
+        for i, uploaded_file in enumerate(uploaded_files):
+            progress = (i + 1) / total_files
+            progress_bar.progress(progress)
+            status_placeholder.text(f"Processing {uploaded_file.name}")
+            
+
+            ### Save uploaded file
+            file_path = save_uploaded_file(uploaded_file)
+            print(f"FILE: {file_path}")
+            process_file(file_path)
+            processed_files += 1
+            ##time.sleep(1)
+
+
+        status_placeholder.text(f"{processed_files} file(s) processed")
+
+    except Exception as e:
+        st.error(f"Error during processing: {str(e)}")
+
 
 
 # Sidebar on streamlit app
 with st.sidebar:
+    st.subheader("Document Upload")
+    uploaded_files = st.file_uploader(
+        "Upload Documents,",
+        type=['pdf','txt'],
+        accept_multiple_files=True,
+        help=f"Upload documents to provide context for the AI. Max Size {FILE_SIZE_MAX} MB per file"
+    )
+
+    if uploaded_files:
+        process_files_button = st.button("Process Documents")
+        if process_files_button:
+            print(f"UPLOADED FILES:\n {uploaded_files}")
+            ## Remove duplicate file names
+            unique_files = []
+            seen_names = set()
+            for file in uploaded_files:
+                if file.name not in seen_names:
+                    unique_files.append(file)
+                    seen_names.add(file.name)
+            #uploaded_files = list(set(uploaded_files))
+            print(f"UPLOADED_UNIQUE_FILES: \n {unique_files}")
+            process_uploaded_documents(unique_files)
+
     # GitHub Repository Information
     st.subheader("GitHub Repository")
     # st.write(f"Repository URL: {st.session_state.repo_url}")
@@ -678,11 +802,16 @@ if not st.session_state.show_logs: # Hide chat interface if logs are shown
         if st.button("Generate Response", disabled=not user_prompt.strip()) or st.session_state.show_logs:
             with st.spinner("Generating response..."):
                 ## Build prompt to generate course outline
-                prompt = build_prompt(system_prompt_course_outline, user_prompt_course_outline)
+                # Retrieve context for outline generation based on the raw objectives text
+                context_for_outline = retrieve_context(user_prompt)
+                prompt = build_prompt(
+                    system_prompt_course_outline,
+                    user_prompt_course_outline
+                )
                 chain = prompt | llm | output_parser
                 # logger.info(f"PROMPT: {prompt}")
                 # Call the LLM to generate response
-                response = chain.invoke({"objectives": user_prompt})
+                response = chain.invoke({"objectives": user_prompt, "context": context_for_outline})
                 print("RESPONSE: \n", response)
                 # st.write(response)
                 st.session_state.chat_response = response
