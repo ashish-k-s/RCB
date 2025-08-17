@@ -35,8 +35,6 @@ global response, topic
 response = ""
 outline = ""
 topic = ""
-course_outline_file = "TEMP-outline.adoc"
-course_structure_file_names = "TEMP-course_structure_file_names.csv"
 
 FILE_SIZE_MAX = 10
 
@@ -202,10 +200,19 @@ if 'vectorstore' not in st.session_state:
 if 'retriever' not in st.session_state:
     st.session_state.retriever = None
 
+if 'datadir' not in st.session_state:
+    st.session_state.datadir = tempfile.mkdtemp()
+
+if 'modules_dir' not in st.session_state:
+    st.session_state.modules_dir = Path(st.session_state.datadir) / "modules"
+    st.session_state.modules_dir.mkdir(parents=True, exist_ok=True)
+
 # --- Configuration for jinja2 file to generate antora.yml---
+course_outline_file = f"{st.session_state.datadir}/TEMP-outline.adoc"
+course_structure_file_names = f"{st.session_state.datadir}/TEMP-course_structure_file_names.csv"
 antora_template_dir = './templates'          # folder where antora.yml.j2 is stored
-antora_output_file = 'antora.yml'            # output location
-antora_pb_file = 'antora-playbook.yml'
+antora_output_file = f"{st.session_state.datadir}/antora.yml"            # output location
+antora_pb_file = f"{st.session_state.datadir}/antora-playbook.yml"
 antora_csv_file = course_structure_file_names
 if st.session_state.repo_name:
     antora_repo_name = st.session_state.repo_name
@@ -251,14 +258,14 @@ def read_chapter_list(antora_csv_file):
                     chapter_desc_str = row[0].strip()
                     st.session_state.desc_chapters.append(chapter_desc_str)
 
-                    os.makedirs(f"modules/{chapter_name}", exist_ok=True)
+                    os.makedirs(f"{st.session_state.modules_dir}/{chapter_name}", exist_ok=True)
                  
                     # Define the full file path for nav.adoc
-                    section_path_nav = Path(f"modules/{chapter_name}/nav.adoc")
-                    section_path_page = Path(f"modules/{chapter_name}/pages/{chapter_name}.adoc")
+                    section_path_nav = Path(f"{st.session_state.modules_dir}/{chapter_name}/nav.adoc")
+                    section_path_page = Path(f"{st.session_state.modules_dir}/{chapter_name}/pages/{chapter_name}.adoc")
 
-                    root_path_nav = Path("modules/ROOT/nav.adoc")
-                    root_path_index = Path("modules/ROOT/pages/index.adoc")
+                    root_path_nav = Path(f"{st.session_state.modules_dir}/ROOT/nav.adoc")
+                    root_path_index = Path(f"{st.session_state.modules_dir}/ROOT/pages/index.adoc")
                     root_path_index.parent.mkdir(parents=True, exist_ok=True)     
 
                     # Create the parent directories if they don't exist
@@ -304,7 +311,7 @@ def read_chapter_list(antora_csv_file):
 
                 if row and row[0].strip().startswith('-') and len(row) > 1:
                     section_name = row[1].strip()
-                    page_section_adoc = f"modules/{chapter_name}/pages/{section_name}.adoc"
+                    page_section_adoc = f"{st.session_state.modules_dir}/{chapter_name}/pages/{section_name}.adoc"
                     with open(page_section_adoc, 'a') as f:
                         text = re.sub(r'(==|-)', '', row[0], count=1)
                         f.write(f"# {text}")
@@ -387,11 +394,11 @@ def generate_antora_yml():
         desc_chapters=topics
     )
 
-    with open("modules/ROOT/pages/index.adoc", 'w') as f:
+    with open(f"{st.session_state.modules_dir}/ROOT/pages/index.adoc", 'w') as f:
         f.write(rendered_root_index)
 
     # Create nav.adoc file in ROOT
-    with open("modules/ROOT/nav.adoc", "w") as file:
+    with open(f"{st.session_state.modules_dir}/ROOT/nav.adoc", "w") as file:
         file.write("* xref:index.adoc[]\n")
 
 
@@ -416,11 +423,12 @@ def move_course_content_to_repo():
         return
 
     # Move the course content files to the repository directory
-    shutil.copy2("antora.yml",st.session_state.repo_dir)
-    shutil.copy2("antora-playbook.yml",st.session_state.repo_dir)
+    shutil.copy2(st.session_state.datadir+"/antora.yml",st.session_state.repo_dir)
+    shutil.copy2(st.session_state.datadir+"/antora-playbook.yml",st.session_state.repo_dir)
+    # shutil.copy2("antora-playbook.yml",st.session_state.repo_dir)
 
     dest_dir_modules = Path(st.session_state.repo_dir) / "modules"
-    shutil.copytree("modules",dest_dir_modules,dirs_exist_ok=True)
+    shutil.copytree(st.session_state.modules_dir,dest_dir_modules,dirs_exist_ok=True)
 
 def push_to_github():
     """
@@ -570,9 +578,9 @@ def update_ai_prompt():
 def save_uploaded_file(uploaded_file) -> str:
     ## Save an uploaded file to the uploads directory
     if not os.path.exists("uploads"):
-        os.makedirs("uploads")
+        os.makedirs(f"{st.session_state.datadir}/uploads")
 
-    file_path = os.path.join("uploads/",uploaded_file.name)
+    file_path = os.path.join(f"{st.session_state.datadir}/uploads/",uploaded_file.name)
     with open(file_path, "wb") as f:
         f.write(uploaded_file.getvalue())
 
@@ -587,11 +595,11 @@ def process_file(file_path):
     docs = text_splitter.split_documents(document)
     
     embeddings = OllamaEmbeddings(model="mxbai-embed-large")
-    persist_dir = str(Path("chroma").absolute())
+    db_dir = str(Path(f"{st.session_state.datadir}/chroma").absolute())
 
     # Initialize or update a single persistent vector store
     if st.session_state.vectorstore is None:
-        db = Chroma.from_documents(docs, embedding=embeddings, persist_directory=persist_dir)
+        db = Chroma.from_documents(docs, embedding=embeddings, persist_directory=db_dir)
         st.session_state.vectorstore = db
     else:
         st.session_state.vectorstore.add_documents(docs)
@@ -730,7 +738,7 @@ with st.sidebar:
                     time.sleep(5)
                     if not st.session_state.repo_dir:
                         temp_dir = tempfile.mkdtemp()
-                        st.session_state.repo_dir = f"{temp_dir}/{st.session_state.repo_name}"
+                        st.session_state.repo_dir = f"{st.session_state.datadir}/content/{st.session_state.repo_name}"
                         st.session_state.repo_dir = Path(st.session_state.repo_dir)
                     ssh_url = convert_https_to_ssh(st.session_state.repo_url)
                     Repo.clone_from(ssh_url, st.session_state.repo_dir)

@@ -8,3 +8,6 @@ langserve
 fastapi
 uvicorn
 PyGithub
+pypdf
+chromadb
+
