@@ -14,7 +14,7 @@ st.set_page_config(
 PROJECT_NAME = ""
 d2_code = ""
 
-st.title(f"Create Image with RCB - {PROJECT_NAME}")
+st.title("Create Image with RCB")
 st.sidebar.success("Select a page above.")
 
 system_prompt_generate_image = """
