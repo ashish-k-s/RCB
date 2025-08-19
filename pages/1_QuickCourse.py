@@ -155,11 +155,14 @@ def build_prompt(system_prompt: str, user_prompt:str):
 
 
 # --- Page layout configuration ---
-st.set_page_config(
-    page_title="Rapid course builder (RCB)",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# st.set_page_config(
+#     page_title="Rapid course builder (RCB)",
+#     layout="wide",
+#     initial_sidebar_state="expanded"
+# )
+st.title("Build QuickCourse using RCB")
+st.sidebar.success("Select a page above.")
+
 
 # --- Initialize session state variables ---
 if 'chat_enabled' not in st.session_state:
@@ -769,7 +772,7 @@ with st.sidebar:
             
 
 # --- Chat Interface ---
-st. title("Rapid Course Builder (RCB)")
+# st.title("Rapid Course Builder (RCB)")
 
 # Show logs are if enabled
 if st.session_state.show_logs:
