@@ -3,6 +3,10 @@ from PIL import Image
 from io import BytesIO
 import subprocess
 import os
+from dotenv import load_dotenv
+
+from langchain_openai import ChatOpenAI
+from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_community.llms import Ollama
 from langchain_core.output_parsers import StrOutputParser
@@ -117,10 +121,34 @@ def update_d2_image_code():
             f.write(st.session_state.d2_image_code)
     st.rerun()
 
-llm = Ollama(model="granite3.3:8b")
-##llm = Ollama(model="codellama:7b")
+# --- MaaS configuration ---
+load_dotenv()
+
+MAAS_API_KEY = os.environ["MAAS_API_KEY"]
+MAAS_API_BASE = os.environ["MAAS_API_BASE"]
+
+if st.session_state.use_maas:
+    print("USING MODEL AS A SERVICE")
+    llm = ChatOpenAI(
+    openai_api_key=MAAS_API_KEY,   # Private model, we don't need a key
+    openai_api_base=MAAS_API_BASE,
+    model_name="granite-3-3-8b-instruct",
+    temperature=0.01,
+    max_tokens=512,
+    streaming=True,
+    callbacks=[StreamingStdOutCallbackHandler()],
+    top_p=0.9,
+    presence_penalty=0.5,
+    model_kwargs={
+        "stream_options": {"include_usage": True}
+    })
+else:
+    print("USING LOCAL MODEL")
+    llm = Ollama(model="granite3.3:8b")
+    ##llm = Ollama(model="codellama:7b")
 output_parser = StrOutputParser()
 
+st.session_state.use_maas = st.sidebar.checkbox("Use Model as a Service",value=True)
 
 image_prompt = st.text_area(
     "Write detailed description for the image to be generated:",
