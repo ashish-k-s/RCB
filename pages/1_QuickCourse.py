@@ -5,11 +5,11 @@ from langchain_community.llms import Ollama
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_ollama import OllamaEmbeddings
-from langchain_community.vectorstores import Chroma
-from langchain_ollama import OllamaEmbeddings
+
 from langchain_community.vectorstores import Chroma
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_retrieval_chain
+from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 
 import streamlit as st
 import os
@@ -210,6 +210,9 @@ if 'modules_dir' not in st.session_state:
     st.session_state.modules_dir = Path(st.session_state.datadir) / "modules"
     st.session_state.modules_dir.mkdir(parents=True, exist_ok=True)
 
+if 'use_maas' not in st.session_state:
+    st.session_state.use_maas = True
+
 # --- Configuration for jinja2 file to generate antora.yml---
 course_outline_file = f"{st.session_state.datadir}/TEMP-outline.adoc"
 course_structure_file_names = f"{st.session_state.datadir}/TEMP-course_structure_file_names.csv"
@@ -236,6 +239,10 @@ repo_name = "test-repo-from-template" # Get this from user input
 
 COMMIT_MESSAGE = os.environ["COMMIT_MESSAGE"] 
 IS_PRIVATE = False
+
+# --- MaaS configuration ---
+MAAS_API_KEY = os.environ["MAAS_API_KEY"]
+MAAS_API_BASE = os.environ["MAAS_API_BASE"]
 
 # --- Read chapter list from CSV file ---
 def read_chapter_list(antora_csv_file):
@@ -302,6 +309,22 @@ def read_chapter_list(antora_csv_file):
                         print("BUILDING PAGE SUMMARY")
                         st.session_state.progress_logs.info(f"Building page summary for topic: {text}")
                         print("prompt: ", prompt)
+                        
+                        if st.session_state.use_maas:
+                            llm = ChatOpenAI(
+                            openai_api_key=MAAS_API_KEY,   # Private model, we don't need a key
+                            openai_api_base=MAAS_API_BASE,
+                            model_name="granite-3-3-8b-instruct",
+                            temperature=0.01,
+                            max_tokens=512,
+                            streaming=True,
+                            callbacks=[StreamingStdOutCallbackHandler()],
+                            top_p=0.9,
+                            presence_penalty=0.5,
+                            model_kwargs={
+                                "stream_options": {"include_usage": True}
+                            })
+
                         chain = prompt | llm | output_parser
                         response = chain.invoke({"outline": st.session_state.outline_str, "topic": text, "context": context_text})
                         print("PAGE SUMMARY: ", response)
@@ -328,6 +351,22 @@ def read_chapter_list(antora_csv_file):
                         print("BUILDING PAGE CONTENT")
                         st.session_state.progress_logs.info(f"Building page content for topic: {text}")
                         print("prompt: ", prompt)
+
+                        if st.session_state.use_maas:
+                            llm = ChatOpenAI(
+                            openai_api_key=MAAS_API_KEY,   # Private model, we don't need a key
+                            openai_api_base=MAAS_API_BASE,
+                            model_name="granite-3-3-8b-instruct",
+                            temperature=0.01,
+                            max_tokens=512,
+                            streaming=True,
+                            callbacks=[StreamingStdOutCallbackHandler()],
+                            top_p=0.9,
+                            presence_penalty=0.5,
+                            model_kwargs={
+                                "stream_options": {"include_usage": True}
+                            })
+
                         chain = prompt | llm | output_parser
                         response = chain.invoke({"outline": st.session_state.outline_str, "topic": text, "context": context_text})
                         print("PAGE CONTENT: ", response)
@@ -764,6 +803,8 @@ with st.sidebar:
         - Use `-` for topics under sections
         """)
 
+        st.session_state.use_maas = st.checkbox("Use Model as a Service",value=True)
+
 
 
         # Enable the chat interface if repository is verified
@@ -819,6 +860,20 @@ if not st.session_state.show_logs: # Hide chat interface if logs are shown
                     system_prompt_course_outline,
                     user_prompt_course_outline
                 )
+                if st.session_state.use_maas:
+                    llm = ChatOpenAI(
+                    openai_api_key=MAAS_API_KEY,   # Private model, we don't need a key
+                    openai_api_base=MAAS_API_BASE,
+                    model_name="granite-3-3-8b-instruct",
+                    temperature=0.01,
+                    max_tokens=512,
+                    streaming=True,
+                    callbacks=[StreamingStdOutCallbackHandler()],
+                    top_p=0.9,
+                    presence_penalty=0.5,
+                    model_kwargs={
+                        "stream_options": {"include_usage": True}
+                    })
                 chain = prompt | llm | output_parser
                 # logger.info(f"PROMPT: {prompt}")
                 # Call the LLM to generate response
