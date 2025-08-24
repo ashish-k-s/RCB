@@ -10,4 +10,4 @@ uvicorn
 PyGithub
 pypdf
 chromadb
-
+piper-tts
