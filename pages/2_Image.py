@@ -16,7 +16,6 @@ st.set_page_config(
 )
 
 PROJECT_NAME = ""
-d2_code = ""
 
 st.title("Create Image with RCB")
 st.sidebar.success("Select a page above.")
@@ -52,7 +51,7 @@ Generate the D2 code for the following diagram description:
 d2_image_name_str = "rcb_generated_image"
 if 'd2_image_path' not in st.session_state:
     st.session_state.d2_image_path = '/tmp/' + d2_image_name_str + '.png'
-if 'd2_image_code_path' not in st.session_state:
+if 'd2_code_path' not in st.session_state:
     st.session_state.d2_code_path = '/tmp/' + d2_image_name_str + '.d2'
 if 'd2_image_code' not in st.session_state:
     st.session_state.d2_image_code = ""

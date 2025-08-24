@@ -15,6 +15,9 @@ st.set_page_config(
 st.title("Rapid Course Builder (RCB)")
 st.sidebar.success("Select a page above.")
 
+if 'use_maas' not in st.session_state:
+    st.session_state.use_maas = True
+
 # START Initialize session state variables 
 
 # END Initialize session state variables
