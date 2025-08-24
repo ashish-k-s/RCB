@@ -22,23 +22,30 @@ st.title("Create Image with RCB")
 st.sidebar.success("Select a page above.")
 
 system_prompt_generate_image = """
-You are an expert in generating diagrams using D2Lang (version 0.7.0).  
+You are an expert in generating diagrams using D2Lang.  
 Your ONLY output must be a valid D2 code block.  
 
 Rules:
-- Do not include explanations, comments, or any text outside the code block.  
-- Use only valid D2 syntax (v0.7.0).  
-- Use container blocks for grouping.  
-- Use directional arrows (-->, <--, <->) for relationships.  
-- Keep diagrams clean and logically structured.  
-
-If the description is unclear, make reasonable assumptions, but ALWAYS output valid D2.
+- Do not include explanations, comments, or any text outside the code block.
+- Use only valid D2 syntax.
+- No incomplete direction blocks.
+- **Do not use** labels.
+- Use directional arrows (-->, <--, <->) for relationships.
+- Use container only to group nodes visually.
+- Use directional arrows for relationships.  
+- **Never use** "=" for assignments, use yaml style ":" assignments instead.
+- No incomplete assignments.
+- Do not leave any dangling references or unspecified connections.
+- Keep diagrams clean and logically structured.
+- ALWAYS output valid D2.
+- Ensure the file compiles without errors using the d2 CLI.
+- At the end, verify that every connection is between two explicitly defined nodes, and rewrite if needed.
 
 """
 
 user_prompt_generate_image = """
 Generate the D2 code for the following diagram description:  
-{image_prompt}
+{user_prompt}
 
 """
 
@@ -49,12 +56,15 @@ if 'd2_image_code_path' not in st.session_state:
     st.session_state.d2_code_path = '/tmp/' + d2_image_name_str + '.d2'
 if 'd2_image_code' not in st.session_state:
     st.session_state.d2_image_code = ""
+if 'use_maas' not in st.session_state:
+    st.session_state.use_maas = True
 
-def build_prompt(system_prompt: str, image_prompt:str):
+def build_prompt(system_prompt: str, user_prompt:str):
+    #print(f"Building prompt with system prompt: {system_prompt} and image prompt: {user_prompt}")
     return ChatPromptTemplate.from_messages(
         [
             ("system", system_prompt),
-            ("user", image_prompt)
+            ("user", user_prompt)
 
         ]
     )
@@ -65,24 +75,27 @@ def generate_image_code():
             system_prompt_generate_image,
             user_prompt_generate_image
         )
+        print(f"Generated prompt: {prompt}")
         chain = prompt | llm | output_parser
         # Call the LLM to generate response
-        response = chain.invoke({"image_prompt": image_prompt})
+        response = chain.invoke({"user_prompt": user_prompt})
         print("D2LANG CODE: \n", response)
         # st.write(response)
         st.session_state.d2_image_code = response
         update_d2_image_code()
 
-    render_image_from_code()
+    #render_image_from_code()
 
 def render_image_from_code():
     print(f"d2_image_code:\n{st.session_state.d2_image_code}")
     print(f"d2_image_path:{st.session_state.d2_image_path}")
     print(f"d2_code_path:{st.session_state.d2_code_path}")
-    #update_d2_image_code()
+    # update_d2_image_code()
     if st.session_state.d2_image_code:
-        if os.path.exists(st.session_state.d2_image_path):
-            os.remove(st.session_state.d2_image_path)
+        # if os.path.exists(st.session_state.d2_image_path):
+        #     os.remove(st.session_state.d2_image_path)
+        with open(st.session_state.d2_code_path, "w") as f:
+            f.write(st.session_state.d2_image_code)
 
         result = subprocess.run (['d2', st.session_state.d2_code_path, st.session_state.d2_image_path], capture_output=True, text=True)
         print(f"Result of d2 command: {result}")
@@ -114,8 +127,7 @@ def render_image_from_code():
     )
 
 def update_d2_image_code():
-    d2_image_code = st.session_state.d2_image_code
-    if d2_image_code:
+    if st.session_state.d2_image_code:
         print(f"WRITING CONTENT TO FILE: {st.session_state.d2_code_path} \n CONTENT: \n {st.session_state.d2_image_code}")
         with open(st.session_state.d2_code_path, "w") as f:
             f.write(st.session_state.d2_image_code)
@@ -150,15 +162,15 @@ output_parser = StrOutputParser()
 
 st.session_state.use_maas = st.sidebar.checkbox("Use Model as a Service",value=True)
 
-image_prompt = st.text_area(
+user_prompt = st.text_area(
     "Write detailed description for the image to be generated:",
     placeholder="Write the description of the image to be generated here...",
     height=30,
-    key="image_prompt",
+    key="user_prompt",
     #disabled=st.session_state.show_logs
 )
 
-generate_image = st.button("Generate Image")
+generate_image = st.button("Generate Image code")
 
 st.session_state.d2_image_code = st.text_area(
    "Write or edit your d2lang code here:",
@@ -173,7 +185,7 @@ render_image = st.button("Render Image")
 
 if generate_image:
     generate_image_code()
-    render_image_from_code()
+    #render_image_from_code()
 
 if render_image:
     render_image_from_code()
