@@ -11,3 +11,6 @@ PyGithub
 pypdf
 chromadb
 piper-tts
+python-pptx
+pdf2image
+moviepy
