@@ -49,8 +49,10 @@ Please return the cleaned version with natural pauses and punctuation to guide s
 """
 
 audio_file_name_str = "rcb_generated_audio"
-if 'audio_file_path_media' not in st.session_state:
-    st.session_state.audio_file_path_media = '/tmp/' + audio_file_name_str + '.wav'
+if 'audio_file_path_wav' not in st.session_state:
+    st.session_state.audio_file_path_wav = '/tmp/' + audio_file_name_str + '.wav'
+if 'audio_file_path_mp3' not in st.session_state:
+    st.session_state.audio_file_path_mp3 = '/tmp/' + audio_file_name_str + '.mp3'
 if 'audio_file_path_txt' not in st.session_state:
     st.session_state.audio_file_path_txt = '/tmp/' + audio_file_name_str + '.txt'
 if 'curated_transcript' not in st.session_state:
@@ -144,4 +146,6 @@ if curate_transcript:
 
 if create_audio_file:
     create_audio_file_from_transcript()
+    st.audio(st.session_state.audio_file_path_mp3)
+
 
