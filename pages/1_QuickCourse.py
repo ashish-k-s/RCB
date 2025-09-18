@@ -234,6 +234,7 @@ antora_course_version = '1'
 load_dotenv()
 GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
 GITHUB_USER = os.environ["GITHUB_USER"]
+GITHUB_ORG = os.environ["GITHUB_ORG"]
 TEMPLATE_REPO = os.environ["TEMPLATE_REPO"]
 repo_name = "test-repo-from-template" # Get this from user input 
 
@@ -549,7 +550,7 @@ def create_github_repo(repo_name) -> bool:
     }
 
     payload = {
-        "owner": GITHUB_USER,
+        "owner": GITHUB_ORG,
         "name": repo_name,
         "description": "Repository created from template using script",
         "private": IS_PRIVATE,
@@ -575,7 +576,7 @@ def create_github_repo(repo_name) -> bool:
 
 def check_github_repo_exists(repo_name: str) -> bool:
     """Check if GitHub repository exists"""
-    url = f"https://api.github.com/repos/{GITHUB_USER}/{repo_name}"
+    url = f"https://api.github.com/repos/{GITHUB_ORG}/{repo_name}"
     response = requests.get(url)
     if response.status_code == 200:
         print(f"Repository '{repo_name}' already exists.")
@@ -747,7 +748,7 @@ with st.sidebar:
             if exists:
                 st.session_state.repo_verified = True
                 st.markdown("Repository already exists. Content will be overwritten.")
-                st.session_state.repo_url = f"https://github.com/{GITHUB_USER}/{repo_name}"
+                st.session_state.repo_url = f"https://github.com/{GITHUB_ORG}/{repo_name}"
                 add_log(f"Repository '{repo_name}' already exists. Content will be overwritten.")
             elif not exists:
                 # If repository does not exist, create it
@@ -757,7 +758,7 @@ with st.sidebar:
                 if success:
                     st.session_state.repo_verified = True
                     st.markdown("Repository created successfully.")
-                    st.session_state.repo_url = f"https://github.com/{GITHUB_USER}/{repo_name}"
+                    st.session_state.repo_url = f"https://github.com/{GITHUB_ORG}/{repo_name}"
                     add_log(f"Repository '{repo_name}' created successfully.")
                 else:
                     st.session_state.repo_verified = False
