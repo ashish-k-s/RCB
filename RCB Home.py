@@ -21,9 +21,17 @@ if 'use_maas' not in st.session_state:
 if 'username' not in st.session_state:
     st.session_state.username = ""
     st.session_state.disable_all = True
+if st.session_state.username:
+    st.sidebar.success(f"Logged in as: {st.session_state.username}")
+    st.session_state.disable_all = False
+else:
+    st.sidebar.warning("Not logged in. Login to access other pages.")
+    st.session_state.disable_all = True
+
 
 user_name = st.text_input("Username", value=st.session_state.username)
 if st.button("Login"):
     st.session_state.username = user_name
     st.session_state.disable_all = False
     print(f"Logged in as: {st.session_state.username}")
+    st.rerun()
