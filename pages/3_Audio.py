@@ -20,6 +20,16 @@ PROJECT_NAME = ""
 
 st.title("Generate Audio using RCB")
 st.sidebar.success("Select a page above.")
+if 'username' not in st.session_state:
+    st.session_state.username = ""
+    st.session_state.disable_all = True
+
+if st.session_state.username:
+    st.sidebar.success(f"Logged in as: {st.session_state.username}")
+    st.session_state.disable_all = False
+else:
+    st.sidebar.warning("Not logged in. [Go to Login Page](./)")
+    st.session_state.disable_all = True
 
 system_prompt_curate_transcript = """
 You are an assistant that cleans and curates raw audio transcripts into natural, spoken-style text. 
@@ -118,17 +128,17 @@ else:
     ##llm = Ollama(model="codellama:7b")
 output_parser = StrOutputParser()
 
-st.session_state.use_maas = st.sidebar.checkbox("Use Model as a Service",value=True)
+st.session_state.use_maas = st.sidebar.checkbox("Use Model as a Service",value=True, disabled=st.session_state.disable_all)
 
 user_prompt = st.text_area(
     "Write the audio transcript text to be curated here:",
     placeholder="Write the audio transcript text to be curated here...",
     height=300,
     key="user_prompt",
-    #disabled=st.session_state.show_logs
+    disabled=st.session_state.disable_all
 )
 
-curate_transcript = st.button("Curate Transcript")
+curate_transcript = st.button("Curate Transcript", disabled=st.session_state.disable_all)
 
 st.session_state.curated_transcript = st.text_area(
    "Write or edit your audio transcript text here:",
@@ -136,10 +146,11 @@ st.session_state.curated_transcript = st.text_area(
     value=st.session_state.curated_transcript,
     height=300,
     key="st.session_state.curated_transcript",
-    on_change=update_curated_transcript
+    on_change=update_curated_transcript,
+    disabled=st.session_state.disable_all
     )
 
-create_audio_file = st.button("Create Audio File")
+create_audio_file = st.button("Create Audio File", disabled=st.session_state.disable_all)
 
 if curate_transcript:
     curate_transcript_text()

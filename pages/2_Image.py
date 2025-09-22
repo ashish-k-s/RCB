@@ -19,6 +19,16 @@ PROJECT_NAME = ""
 
 st.title("Create Image with RCB")
 st.sidebar.success("Select a page above.")
+if 'username' not in st.session_state:
+    st.session_state.username = ""
+    st.session_state.disable_all = True
+
+if st.session_state.username:
+    st.sidebar.success(f"Logged in as: {st.session_state.username}")
+    st.session_state.disable_all = False
+else:
+    st.sidebar.warning("Not logged in. [Go to Login Page](./)")
+    st.session_state.disable_all = True
 
 system_prompt_generate_image = """
 You are an expert in generating diagrams using D2Lang.  
@@ -159,17 +169,17 @@ else:
     ##llm = Ollama(model="codellama:7b")
 output_parser = StrOutputParser()
 
-st.session_state.use_maas = st.sidebar.checkbox("Use Model as a Service",value=True)
+st.session_state.use_maas = st.sidebar.checkbox("Use Model as a Service",value=True, disabled=st.session_state.disable_all)
 
 user_prompt = st.text_area(
     "Write detailed description for the image to be generated:",
     placeholder="Write the description of the image to be generated here...",
     height=30,
     key="user_prompt",
-    #disabled=st.session_state.show_logs
+    disabled=st.session_state.disable_all
 )
 
-generate_image = st.button("Generate Image code")
+generate_image = st.button("Generate Image code", disabled=st.session_state.disable_all)
 
 st.session_state.d2_image_code = st.text_area(
    "Write or edit your d2lang code here:",
@@ -177,10 +187,11 @@ st.session_state.d2_image_code = st.text_area(
     value=st.session_state.d2_image_code,
     height=300,
     key="st.session_state.d2_image_code",
-    on_change=update_d2_image_code
+    on_change=update_d2_image_code,
+    disabled=st.session_state.disable_all
     )
  
-render_image = st.button("Render Image")
+render_image = st.button("Render Image", disabled=st.session_state.disable_all)
 
 if generate_image:
     generate_image_code()

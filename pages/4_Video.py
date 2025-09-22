@@ -17,6 +17,16 @@ st.set_page_config(
 
 st.title("Create Video using RCB")
 st.sidebar.success("Select a page above.")
+if 'username' not in st.session_state:
+    st.session_state.username = ""
+    st.session_state.disable_all = True
+
+if st.session_state.username:
+    st.sidebar.success(f"Logged in as: {st.session_state.username}")
+    st.session_state.disable_all = False
+else:
+    st.sidebar.warning("Not logged in. [Go to Login Page](./)")
+    st.session_state.disable_all = True
 
 audio_file_name_str = "rcb_generated_audio"
 if 'audio_file_path_wav' not in st.session_state:
@@ -210,7 +220,8 @@ uploaded_file = st.sidebar.file_uploader(
     "Upload Presentation,",
     type=['pptx'],
     accept_multiple_files=False,
-    help="Upload your presentation file (make sure it includes speaker notes)."
+    help="Upload your presentation file (make sure it includes speaker notes).",
+    disabled=st.session_state.disable_all
 )
 
 if uploaded_file:

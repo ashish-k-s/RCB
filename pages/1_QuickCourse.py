@@ -162,6 +162,15 @@ def build_prompt(system_prompt: str, user_prompt:str):
 # )
 st.title("Build QuickCourse using RCB")
 st.sidebar.success("Select a page above.")
+if 'username' not in st.session_state:
+    st.session_state.username = ""
+    st.session_state.disable_all = True
+if st.session_state.username:
+    st.sidebar.success(f"Logged in as: {st.session_state.username}")
+    st.session_state.disable_all = False
+else:
+    st.sidebar.warning("Not logged in. [Go to Login Page](./)")
+    st.session_state.disable_all = True
 
 
 # --- Initialize session state variables ---
@@ -710,7 +719,9 @@ with st.sidebar:
         "Upload Documents,",
         type=['pdf','txt'],
         accept_multiple_files=True,
-        help=f"Upload documents to provide context for the AI. Max Size {FILE_SIZE_MAX} MB per file"
+        help=f"Upload documents to provide context for the AI. Max Size {FILE_SIZE_MAX} MB per file",
+        disabled=st.session_state.disable_all
+        
     )
 
     if uploaded_files:
@@ -735,7 +746,8 @@ with st.sidebar:
     
     repo_name = st.text_input(
         "Repository Name",
-        help="Enter the name of the GitHub repository"
+        help="Enter the name of the GitHub repository",
+        disabled=st.session_state.disable_all
     )
 
     if not st.session_state.repo_name:
