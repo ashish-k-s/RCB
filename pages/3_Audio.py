@@ -10,7 +10,7 @@ from langchain_community.llms import Ollama
 from langchain_core.output_parsers import StrOutputParser
 
 from audio import create_audio_file_from_transcript
-
+from rcb_init import init_page
 
 st.set_page_config(
     page_title="Audio using RCB"
@@ -19,17 +19,7 @@ st.set_page_config(
 PROJECT_NAME = ""
 
 st.title("Generate Audio using RCB")
-st.sidebar.success("Select a page above.")
-if 'username' not in st.session_state:
-    st.session_state.username = ""
-    st.session_state.disable_all = True
-
-if st.session_state.username:
-    st.sidebar.success(f"Logged in as: {st.session_state.username}")
-    st.session_state.disable_all = False
-else:
-    st.sidebar.warning("Not logged in. [Go to Login Page](./)")
-    st.session_state.disable_all = True
+init_page()
 
 system_prompt_curate_transcript = """
 You are an assistant that cleans and curates raw audio transcripts into natural, spoken-style text. 

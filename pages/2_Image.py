@@ -11,6 +11,8 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_community.llms import Ollama
 from langchain_core.output_parsers import StrOutputParser
 
+from rcb_init import init_page
+
 st.set_page_config(
     page_title="Image using RCB"
 )
@@ -18,17 +20,7 @@ st.set_page_config(
 PROJECT_NAME = ""
 
 st.title("Create Image with RCB")
-st.sidebar.success("Select a page above.")
-if 'username' not in st.session_state:
-    st.session_state.username = ""
-    st.session_state.disable_all = True
-
-if st.session_state.username:
-    st.sidebar.success(f"Logged in as: {st.session_state.username}")
-    st.session_state.disable_all = False
-else:
-    st.sidebar.warning("Not logged in. [Go to Login Page](./)")
-    st.session_state.disable_all = True
+init_page()
 
 system_prompt_generate_image = """
 You are an expert in generating diagrams using D2Lang.  

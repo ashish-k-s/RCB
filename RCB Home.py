@@ -8,25 +8,18 @@ import tempfile
 import shutil
 import os
 
+from rcb_init import init_page
+
 st.set_page_config(
     page_title="Rapid Course Builder (RCB)"
 )
 
 st.title("Rapid Course Builder (RCB)")
 st.subheader("This is a placeholder login page")
-st.sidebar.success("Select a page above.")
+init_page()
 
 if 'use_maas' not in st.session_state:
     st.session_state.use_maas = True
-if 'username' not in st.session_state:
-    st.session_state.username = ""
-    st.session_state.disable_all = True
-if st.session_state.username:
-    st.sidebar.success(f"Logged in as: {st.session_state.username}")
-    st.session_state.disable_all = False
-else:
-    st.sidebar.warning("Not logged in. Login to access other pages.")
-    st.session_state.disable_all = True
 
 
 user_name = st.text_input("Username", value=st.session_state.username)

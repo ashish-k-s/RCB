@@ -31,6 +31,8 @@ import io
 from typing import List, Optional
 import shutil
 
+from rcb_init import init_page
+
 global response, topic
 response = ""
 outline = ""
@@ -153,25 +155,9 @@ def build_prompt(system_prompt: str, user_prompt:str):
         ]
     )
 
-
 # --- Page layout configuration ---
-# st.set_page_config(
-#     page_title="Rapid course builder (RCB)",
-#     layout="wide",
-#     initial_sidebar_state="expanded"
-# )
 st.title("Build QuickCourse using RCB")
-st.sidebar.success("Select a page above.")
-if 'username' not in st.session_state:
-    st.session_state.username = ""
-    st.session_state.disable_all = True
-if st.session_state.username:
-    st.sidebar.success(f"Logged in as: {st.session_state.username}")
-    st.session_state.disable_all = False
-else:
-    st.sidebar.warning("Not logged in. [Go to Login Page](./)")
-    st.session_state.disable_all = True
-
+init_page()
 
 # --- Initialize session state variables ---
 if 'chat_enabled' not in st.session_state:

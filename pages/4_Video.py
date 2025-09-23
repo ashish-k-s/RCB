@@ -10,23 +10,14 @@ import glob
 from pathlib import Path
 
 from audio import create_audio_file_from_transcript
+from rcb_init import init_page
 
 st.set_page_config(
     page_title="Video with RCB"
 )
 
 st.title("Create Video using RCB")
-st.sidebar.success("Select a page above.")
-if 'username' not in st.session_state:
-    st.session_state.username = ""
-    st.session_state.disable_all = True
-
-if st.session_state.username:
-    st.sidebar.success(f"Logged in as: {st.session_state.username}")
-    st.session_state.disable_all = False
-else:
-    st.sidebar.warning("Not logged in. [Go to Login Page](./)")
-    st.session_state.disable_all = True
+init_page()
 
 audio_file_name_str = "rcb_generated_audio"
 if 'audio_file_path_wav' not in st.session_state:
