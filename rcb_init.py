@@ -1,7 +1,6 @@
 import streamlit as st
 
 def init_page():
-    st.title("Welcome to RCB - Rapid Course Builder")
     st.sidebar.success("Select a page above.")
     if 'username' not in st.session_state:
         st.session_state.username = ""
