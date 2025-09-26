@@ -54,6 +54,10 @@ def seconds_to_hhmmss_timedelta(seconds):
     td = timedelta(seconds=seconds)
     return str(td)
 
+if not st.session_state.username:
+    st.info("Please log in to access your demo videos and upload new ones.")
+    st.stop()
+    
 if video_files:
     st.sidebar.subheader("Select a demo video from your uploads:")
     st.session_state.selected_file = st.sidebar.selectbox("Choose a file:", video_files)
