@@ -4,6 +4,7 @@ from io import BytesIO
 import subprocess
 import os
 from dotenv import load_dotenv
+import google.generativeai as genai
 
 from langchain_openai import ChatOpenAI
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
@@ -11,16 +12,26 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_community.llms import Ollama
 from langchain_core.output_parsers import StrOutputParser
 
-from rcb_init import init_page
+from rcb_init import init_page, init_llm
+from rcb_llm_manager import call_llm_to_generate_response
 
 st.set_page_config(
     page_title="Image using RCB"
 )
 
-PROJECT_NAME = ""
-
 st.title("Create Image with RCB")
 init_page()
+init_llm()
+
+d2_image_name_str = "rcb_generated_image"
+if 'd2_image_path' not in st.session_state:
+    st.session_state.d2_image_path = st.session_state.user_dir + d2_image_name_str + '.png'
+if 'd2_code_path' not in st.session_state:
+    st.session_state.d2_code_path = st.session_state.user_dir + d2_image_name_str + '.d2'
+if 'd2_image_code' not in st.session_state:
+    st.session_state.d2_image_code = ""
+if 'user_prompt' not in st.session_state:
+    st.session_state.user_prompt = ""
 
 system_prompt_generate_image = """
 You are an expert in generating diagrams using D2Lang.  
@@ -44,48 +55,17 @@ Rules:
 
 """
 
-user_prompt_generate_image = """
+user_prompt_generate_image = f"""
 Generate the D2 code for the following diagram description:  
-{user_prompt}
+{st.session_state.user_prompt}
 
 """
 
-d2_image_name_str = "rcb_generated_image"
-if 'd2_image_path' not in st.session_state:
-    st.session_state.d2_image_path = '/tmp/' + d2_image_name_str + '.png'
-if 'd2_code_path' not in st.session_state:
-    st.session_state.d2_code_path = '/tmp/' + d2_image_name_str + '.d2'
-if 'd2_image_code' not in st.session_state:
-    st.session_state.d2_image_code = ""
-if 'use_maas' not in st.session_state:
-    st.session_state.use_maas = True
-
-def build_prompt(system_prompt: str, user_prompt:str):
-    #print(f"Building prompt with system prompt: {system_prompt} and image prompt: {user_prompt}")
-    return ChatPromptTemplate.from_messages(
-        [
-            ("system", system_prompt),
-            ("user", user_prompt)
-
-        ]
-    )
-
 def generate_image_code():
     with st.spinner("Generating code for image..."):
-        prompt = build_prompt(
-            system_prompt_generate_image,
-            user_prompt_generate_image
-        )
-        print(f"Generated prompt: {prompt}")
-        chain = prompt | llm | output_parser
-        # Call the LLM to generate response
-        response = chain.invoke({"user_prompt": user_prompt})
-        print("D2LANG CODE: \n", response)
-        # st.write(response)
-        st.session_state.d2_image_code = response
+        st.session_state.d2_image_code = call_llm_to_generate_response(st.session_state.model_choice, system_prompt_generate_image, user_prompt_generate_image)
+        print("D2LANG CODE: \n", st.session_state.d2_image_code)
         update_d2_image_code()
-
-    #render_image_from_code()
 
 def render_image_from_code():
     print(f"d2_image_code:\n{st.session_state.d2_image_code}")
@@ -139,35 +119,14 @@ load_dotenv()
 
 MAAS_API_KEY = os.environ["MAAS_API_KEY"]
 MAAS_API_BASE = os.environ["MAAS_API_BASE"]
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+GEMINI_API_BASE = os.environ.get("GEMINI_API_BASE")
 
-if st.session_state.use_maas:
-    print("USING MODEL AS A SERVICE")
-    llm = ChatOpenAI(
-    openai_api_key=MAAS_API_KEY,   # Private model, we don't need a key
-    openai_api_base=MAAS_API_BASE,
-    model_name="granite-3-3-8b-instruct",
-    temperature=0.01,
-    max_tokens=512,
-    streaming=True,
-    callbacks=[StreamingStdOutCallbackHandler()],
-    top_p=0.9,
-    presence_penalty=0.5,
-    model_kwargs={
-        "stream_options": {"include_usage": True}
-    })
-else:
-    print("USING LOCAL MODEL")
-    llm = Ollama(model="granite3.3:8b")
-    ##llm = Ollama(model="codellama:7b")
-output_parser = StrOutputParser()
-
-st.session_state.use_maas = st.sidebar.checkbox("Use Model as a Service",value=True, disabled=st.session_state.disable_all)
-
-user_prompt = st.text_area(
+user_prompt_text = st.text_area(
     "Write detailed description for the image to be generated:",
     placeholder="Write the description of the image to be generated here...",
     height=30,
-    key="user_prompt",
+    key="user_prompt_text",
     disabled=st.session_state.disable_all
 )
 
@@ -186,6 +145,17 @@ st.session_state.d2_image_code = st.text_area(
 render_image = st.button("Render Image", disabled=st.session_state.disable_all)
 
 if generate_image:
+    st.session_state.user_prompt = user_prompt_text
+    print(f"Generating image code for User Prompt: {st.session_state.user_prompt}")    
+    if not st.session_state.user_prompt.strip():
+        st.warning("Please enter a description for the image to be generated.")
+        st.stop()
+
+    user_prompt_generate_image = f"""
+    Generate the D2 code for the following diagram description:  
+    {st.session_state.user_prompt}
+
+    """
     generate_image_code()
     #render_image_from_code()
 
