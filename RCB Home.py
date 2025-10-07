@@ -16,6 +16,10 @@ st.set_page_config(
 
 st.title("Rapid Course Builder (RCB)")
 st.subheader("This is a placeholder login page")
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = "Home"
+st.session_state.current_page = "Home"
+
 init_page()
 
 if 'use_maas' not in st.session_state:
