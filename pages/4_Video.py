@@ -17,6 +17,10 @@ st.set_page_config(
 )
 
 st.title("Create Video using RCB")
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = "Video"
+st.session_state.current_page = "Video"
+
 init_page()
 
 audio_file_name_str = "rcb_generated_audio"

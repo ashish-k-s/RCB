@@ -20,6 +20,10 @@ st.set_page_config(
 )
 
 st.title("Create Image with RCB")
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = "Image"
+st.session_state.current_page = "Image"
+
 init_page()
 init_llm()
 

@@ -19,6 +19,10 @@ st.set_page_config(
 PROJECT_NAME = ""
 
 st.title("Generate Audio using RCB")
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = "Audio"
+st.session_state.current_page = "Audio"
+
 init_page()
 
 system_prompt_curate_transcript = """
@@ -140,13 +144,25 @@ st.session_state.curated_transcript = st.text_area(
     disabled=st.session_state.disable_all
     )
 
-create_audio_file = st.button("Create Audio File", disabled=st.session_state.disable_all)
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    generate_audio = st.button("Generate Audio", disabled=st.session_state.disable_all)
+
+with col2:
+    st.text_input(" ", placeholder="Name for the audio file here" , key="audio_file_name", label_visibility="collapsed", disabled=st.session_state.disable_all)
+
+with col3:
+    save_audio = st.button("Save Audio", disabled=st.session_state.disable_all)
 
 if curate_transcript:
     curate_transcript_text()
 
-if create_audio_file:
+if generate_audio:
     create_audio_file_from_transcript()
+
+if save_audio:
+    save_audio_file()
     st.audio(st.session_state.audio_file_path_mp3)
 
 

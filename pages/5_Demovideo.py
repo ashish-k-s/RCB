@@ -9,6 +9,10 @@ import subprocess
 from rcb_init import init_page
 
 st.title("Build Your Demovideo with RCB")
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = "DemoVideo"
+st.session_state.current_page = "DemoVideo"
+
 init_page()
 
 if "selected_file" not in st.session_state:
@@ -50,8 +54,8 @@ def clear_actions():
         pass
 
 def seconds_to_hhmmss_timedelta(seconds):
-    """Converts seconds to hh:mm:ss format using timedelta."""
-    td = timedelta(seconds=seconds)
+    """Converts seconds to hh:mm:ss format using timedelta, discarding fractions."""
+    td = timedelta(seconds=int(float(seconds)))
     return str(td)
 
 if not st.session_state.username:
