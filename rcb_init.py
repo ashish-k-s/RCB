@@ -1,5 +1,7 @@
 import streamlit as st
 import os
+import time
+
 from dotenv import load_dotenv
 
 from langchain_openai import ChatOpenAI
@@ -7,6 +9,12 @@ from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 import google.generativeai as genai
 
 load_dotenv()
+
+def add_log(message: str):
+    """Add a message to the logs"""
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    st.session_state.logs.append(f"[{timestamp}] {message}")
+    print(f"LOG: {st.session_state.logs}")
 
 def init_page():
     st.sidebar.info("Select a page above.")
@@ -36,6 +44,36 @@ def init_image_page():
         st.session_state.d2_image_code = ""
     if 'image_name' not in st.session_state:
         st.session_state.image_name = ""
+
+def init_quickcourse_page():
+    if 'repo_verified' not in st.session_state:
+        st.session_state.repo_verified = False
+    if 'repo_name' not in st.session_state:
+        st.session_state.repo_name = ""
+    if 'repo_url' not in st.session_state:
+        st.session_state.repo_url = ""
+    if 'repo_dir' not in st.session_state:
+        st.session_state.repo_dir = "" 
+    if 'repo_cloned' not in st.session_state:
+        st.session_state.repo_cloned = False
+
+    if 'logs' not in st.session_state:
+        st.session_state.logs = []
+
+    load_dotenv()
+    GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
+    GITHUB_USER = os.environ["GITHUB_USER"]
+    if 'github_org' not in st.session_state:
+        st.session_state.github_org = os.environ["GITHUB_ORG"]
+    TEMPLATE_REPO = os.environ["TEMPLATE_REPO"]
+    #repo_name = "test-repo-from-template" # Get this from user input 
+
+    COMMIT_MESSAGE = os.environ["COMMIT_MESSAGE"] 
+    IS_PRIVATE = False
+
+    # --- MaaS configuration ---
+    MAAS_API_KEY = os.environ["MAAS_API_KEY"]
+    MAAS_API_BASE = os.environ["MAAS_API_BASE"]
 
 def init_llm():
     load_dotenv()
