@@ -12,7 +12,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_community.llms import Ollama
 from langchain_core.output_parsers import StrOutputParser
 
-from rcb_init import init_page, init_llm
+from rcb_init import init_page, init_llm_vars
 from rcb_llm_manager import call_llm_to_generate_response
 
 st.set_page_config(
@@ -25,7 +25,7 @@ if 'current_page' not in st.session_state:
 st.session_state.current_page = "Image"
 
 init_page()
-init_llm()
+init_llm_vars()
 
 d2_image_name_str = "rcb_generated_image"
 if 'd2_image_path' not in st.session_state:
@@ -66,7 +66,7 @@ Generate the D2 code for the following diagram description:
 """
 
 def generate_image_code():
-    with st.spinner("Generating code for image..."):
+    with st.spinner(f"Generating code for image using {st.session_state.model_choice}..."):
         st.session_state.d2_image_code = call_llm_to_generate_response(st.session_state.model_choice, system_prompt_generate_image, user_prompt_generate_image)
         print("D2LANG CODE: \n", st.session_state.d2_image_code)
         update_d2_image_code()

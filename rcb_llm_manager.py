@@ -13,15 +13,15 @@ MAAS_API_BASE = os.environ["MAAS_API_BASE"]
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 GEMINI_API_BASE = os.environ.get("GEMINI_API_BASE")
 
-def build_prompt(system_prompt: str, user_prompt:str):
-    #print(f"Building prompt with system prompt: {system_prompt} and image prompt: {user_prompt}")
-    return ChatPromptTemplate.from_messages(
-        [
-            ("system", system_prompt),
-            ("user", user_prompt)
+# def build_prompt(system_prompt: str, user_prompt:str):
+#     #print(f"Building prompt with system prompt: {system_prompt} and image prompt: {user_prompt}")
+#     return ChatPromptTemplate.from_messages(
+#         [
+#             ("system", system_prompt),
+#             ("user", user_prompt)
 
-        ]
-    )
+#         ]
+#     )
 
 def call_llm_to_generate_response(model_choice: str, system_prompt: str, user_prompt: str):
     print(f"\ncall_llm with model_choice: {model_choice} \nsystem_prompt: {system_prompt} \nuser_prompt: {user_prompt}")
@@ -48,6 +48,10 @@ def call_llm_to_generate_response(model_choice: str, system_prompt: str, user_pr
                 ("human", "{user_prompt}"),
             ]
         )
+        prompt_str = prompt.format_prompt(system_prompt=system_prompt, user_prompt=user_prompt)
+        print(f"DEBUG: PROMPT STR: {prompt_str.to_string()}")
+        print(f"DEBUG: Type of prompt: {type(prompt)}")
+        print(f"DEBUG: PROMPT MESSAGES: {prompt.messages}")
         # Create LLM Chain
         chain = prompt | llm
         response = chain.invoke({"system_prompt": system_prompt, "user_prompt": user_prompt})
