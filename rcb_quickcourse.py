@@ -122,7 +122,7 @@ def process_file_for_rag(file_path):
     docs = text_splitter.split_documents(document)
     
     embeddings = OllamaEmbeddings(model="mxbai-embed-large")
-    db_dir = str(Path(f"{st.session_state.datadir}/chroma").absolute())
+    db_dir = str(Path(f"{st.session_state.user_dir}/chroma").absolute())
 
     # Initialize or update a single persistent vector store
     if st.session_state.vectorstore is None:
