@@ -83,21 +83,24 @@ def setup_github_repo():
             st.session_state.repo_verified = True
             st.markdown("Repository already exists. Content will be overwritten.")
             st.session_state.repo_url = f"https://github.com/{st.session_state.github_org}/{st.session_state.repo_name}"
-            add_log(f"Repository '{st.session_state.repo_name}' already exists. Content will be overwritten.")
+            print(f"Repository '{st.session_state.repo_name}' already exists. Content will be overwritten.")
+            return True
         elif not exists:
             # If repository does not exist, create it
             st.session_state.repo_verified = False
-            add_log(f"Creating new repository '{st.session_state.repo_name}'...")
-            success = create_github_repo(st.session_state.repo_name)
-            if success:
+            print(f"Creating new repository '{st.session_state.repo_name}'...")
+            repo_created = create_github_repo(st.session_state.repo_name)
+            if repo_created:
                 st.session_state.repo_verified = True
                 st.markdown("Repository created successfully.")
                 st.session_state.repo_url = f"https://github.com/{st.session_state.github_org}/{st.session_state.repo_name}"
-                add_log(f"Repository '{st.session_state.repo_name}' created successfully.")
+                print(f"Repository '{st.session_state.repo_name}' created successfully.")
+                return True
             else:
                 st.session_state.repo_verified = False
                 st.session_state.repo_url = ""
-                add_log(f"Failed to create repository '{st.session_state.repo_name}'. Please check the logs.")
+                print(f"Failed to create repository '{st.session_state.repo_name}'. Please check the logs.")
+                return False
     
     # Show repository link if verified
     if st.session_state.repo_verified and st.session_state.repo_url:
@@ -177,3 +180,36 @@ def push_to_github():
         print(f"Changes pushed to GitHub repository '{st.session_state.repo_name}' successfully.")
     except Exception as e:
         st.error(f"Failed to push changes: {e}")
+
+def add_github_contributors(contributors_input: str):
+    """
+    Add contributors to the GitHub repository.
+    """
+    init_github_vars()
+    if not st.session_state.repo_verified or not st.session_state.repo_url:
+        st.error("Repository is not verified. Please set up the repository first.")
+        return
+
+    # Parse contributors input
+    contributors = [c.strip() for c in contributors_input.replace(',', ' ').split() if c.strip()]
+    if not contributors:
+        st.info("No contributors provided.")
+        return
+
+    headers = {
+        "Authorization": f"token {st.session_state.github_token}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+
+    for contributor in contributors:
+        url = f"https://api.github.com/repos/{st.session_state.github_org}/{st.session_state.repo_name}/collaborators/{contributor}"
+        payload = {
+            "permission": "push"  # Can be 'pull', 'push', or 'admin'
+        }
+        response = requests.put(url, headers=headers, json=payload)
+        if response.status_code in [201, 204]:
+            st.toast(f"Added contributor '{contributor}' successfully.")
+            print(f"Contributor '{contributor}' added to repository '{st.session_state.repo_name}'.")
+        else:
+            st.error(f"Failed to add contributor '{contributor}': {response.json()}")
+            print(f"Error adding contributor '{contributor}': {response.json()}")

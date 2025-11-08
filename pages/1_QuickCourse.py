@@ -20,7 +20,7 @@ init_quickcourse_vars()
 #from rcb_quickcourse import process_uploaded_documents, save_uploaded_documents
 from rcb_quickcourse import process_uploaded_documents, extract_code_blocks, multiline_to_csv, generate_antora_yml, retrieve_context
 
-from rcb_github import setup_github_repo, push_to_github
+from rcb_github import setup_github_repo, push_to_github, add_github_contributors
 from rcb_llm_manager import call_llm_to_generate_response
 
 
@@ -274,12 +274,21 @@ with st.sidebar:
         help="Enter the name of the GitHub repository",
         disabled=st.session_state.disable_all
     )
+    github_contributors = st.text_area(
+        "Contributors (List of GitHub usernames separated by new line or space or comma)",
+        help="Enter GitHub usernames of contributors, separated by commas",
+        disabled=st.session_state.disable_all
+    )
+
     if not st.session_state.repo_name:
         st.session_state.repo_name = repo_name.strip()
 
     if st.button("Setup Repository", disabled=not st.session_state.repo_name):
         if setup_github_repo():
             st.success("Repository setup successfully")
+            add_github_contributors(github_contributors)
+        else:
+            st.error("Failed to setup repository. Check logs for details.")
 
     if st.session_state.repo_verified:
         # Show required structure for the course objectives
