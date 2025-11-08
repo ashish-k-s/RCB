@@ -275,8 +275,8 @@ with st.sidebar:
         disabled=st.session_state.disable_all
     )
     github_contributors = st.text_area(
-        "Contributors (List of GitHub usernames separated by new line or space or comma)",
-        help="Enter GitHub usernames of contributors, separated by commas",
+        "Contributors (List of GitHub usernames separated by new line)",
+        help="Enter GitHub usernames of contributors, separated by new line",
         disabled=st.session_state.disable_all
     )
 
