@@ -21,6 +21,8 @@ def init_page():
         st.session_state.data_dir = os.getenv("DATA_DIR", "/tmp/rcb_data") 
     if 'user_dir' not in st.session_state:
         st.session_state.user_dir = ""
+    if 'temp_dir' not in st.session_state:
+        st.session_state.temp_dir = f"{st.session_state.data_dir}/temp"
     if 'username' not in st.session_state:
         st.session_state.username = ""
         st.session_state.disable_all = True
@@ -29,6 +31,10 @@ def init_page():
         st.session_state.user_dir = f"{st.session_state.data_dir}/{st.session_state.username}"
         st.session_state.disable_all = False
         os.makedirs(st.session_state.user_dir, exist_ok=True)
+        os.makedirs(st.session_state.temp_dir, exist_ok=True)
+        os.makedirs(f"{st.session_state.user_dir}/audio", exist_ok=True)
+        os.makedirs(f"{st.session_state.user_dir}/video", exist_ok=True)
+        os.makedirs(f"{st.session_state.user_dir}/images", exist_ok=True)
     else:
         if st.session_state.current_page != "Home":
             st.sidebar.warning("Not logged in. [Go to Login Page](./)")
@@ -154,6 +160,40 @@ def init_quickcourse_vars():
     if st.session_state.user_dir and st.session_state.repo_name:
         st.session_state.antora_pb_file = f"{st.session_state.user_dir}/content/{st.session_state.repo_name}/antora-playbook.yml"
 
+def init_audio_page():
+    st.session_state.tts_choice = st.sidebar.selectbox(
+    "Choose TTS Model",
+    options=["PiperTTS", "GeminiTTS"],
+    index=0,
+    disabled=st.session_state.disable_all
+    )
+    st.session_state.voice_type_mf = st.sidebar.radio(
+        "Choose Voice Type",
+        options=["Female", "Male"],
+        index=0,
+        disabled=st.session_state.disable_all
+    )
+
+def init_audio_vars():
+    st.session_state.default_audio_file_name_str = "rcb_generated_audio"
+    st.session_state.audio_data_dir = f"{st.session_state.user_dir}/audio"
+    st.session_state.default_audio_file_path_wav = f"{st.session_state.audio_data_dir}/{st.session_state.default_audio_file_name_str}.wav"
+    st.session_state.default_audio_file_path_mp3 = f"{st.session_state.audio_data_dir}/{st.session_state.default_audio_file_name_str}.mp3"
+    st.session_state.default_audio_file_path_txt = f"{st.session_state.audio_data_dir}/{st.session_state.default_audio_file_name_str}.txt"
+
+    if 'audio_file_name_str' not in st.session_state:
+        st.session_state.audio_file_name_str = ""
+    st.session_state.audio_file_path_txt = f"{st.session_state.audio_data_dir}/{st.session_state.audio_file_name_str}.txt"
+    st.session_state.audio_file_path_wav = f"{st.session_state.audio_data_dir}/{st.session_state.audio_file_name_str}.wav"
+    st.session_state.audio_file_path_mp3 = f"{st.session_state.audio_data_dir}/{st.session_state.audio_file_name_str}.mp3"
+    if 'provided_transcript' not in st.session_state:
+        st.session_state.provided_transcript = ""
+    if 'curated_transcript' not in st.session_state:
+        st.session_state.curated_transcript = ""
+
+    st.session_state.gemini_tts_voice_female = 'Kore'
+    st.session_state.gemini_tts_voice_male = 'Orus'
+
 def init_quickcourse_prompts():
     st.session_state.system_prompt_course_outline = f"""
     You are a Course Designer expert in understanding the requirements of the curriculum and developing the course outline.
@@ -252,3 +292,39 @@ def init_quickcourse_prompts():
     Stick to the mentioned topic in your response.
     """
 
+def init_audio_prompts():
+    print("Initializing audio prompts...")
+    st.session_state.system_prompt_curate_transcript = f"""
+    You are an assistant that cleans and curates raw audio transcripts into natural, spoken-style text. 
+    Your goal is to make the text sound clear, fluent, and engaging when read aloud by a text-to-speech (TTS) system. 
+
+    Guidelines:
+    - Remove filler words (“um,” “uh,” “like,” “you know”) and false starts. 
+    - Fix grammar, tense, and sentence flow while preserving the speaker’s intent. 
+    - Break long sentences into shorter, spoken-style sentences. 
+    - Insert natural pauses using punctuation:
+        - Commas (,) for short pauses.
+        - Periods (.) for full stops and longer pauses.
+        - Question marks (?) and exclamation points (!) as appropriate.
+        - Ellipses (…) or line breaks for longer pauses or dramatic effect.
+    - Retain a conversational tone while ensuring clarity. 
+    - Do not add new content or change meaning. 
+    - Do not include stage directions, notes, or commentary—output only the curated spoken text.
+    """
+    st.session_state.user_prompt_curate_transcript = f"""
+    Here is a raw transcript that needs to be curated for TTS:
+
+    {st.session_state.provided_transcript}
+
+    Return the cleaned version with natural pauses and punctuation to guide speech.
+    """
+    st.session_state.gemini_tts_prompt = f"""
+    Generate audio for a professional training module.
+    Speaker: Voice with a clear American accent. 
+    Tone: Professional, engaging, and informative. 
+    Pace: Moderate and steady, with clear enunciation, ensuring every word is easy to understand. 
+    Style: Instructional and authoritative, like an expert trainer guiding new learners.
+
+    Text: {st.session_state.curated_transcript}
+
+    """
