@@ -300,7 +300,7 @@ with st.sidebar:
         - Use `-` for topics under sections
         """)
         st.markdown(f"Repository URL: [View Repository]({st.session_state.repo_url})", unsafe_allow_html=True)
-
+        st.session_state.chat_enabled = True
 
 
 # --- Chat Interface ---
