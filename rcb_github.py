@@ -38,6 +38,7 @@ def create_github_repo(repo_name) -> bool:
     if response.status_code == 201:
         print(f"Repository '{repo_name}' created successfully.")
         st.session_state.repo_verified = True
+        st.session_state.repo_dir = f"{st.session_state.user_dir}/content/{repo_name}"
         st.session_state.repo_url = response.json().get('html_url', '')
         return True
     else:
@@ -48,12 +49,12 @@ def create_github_repo(repo_name) -> bool:
 
 def check_github_repo_exists(repo_name: str) -> bool:
     """Check if GitHub repository exists"""
-    init_github_vars()
     url = f"https://api.github.com/repos/{st.session_state.github_org}/{repo_name}"
     response = requests.get(url)
     if response.status_code == 200:
         print(f"Repository '{repo_name}' already exists.")
         st.session_state.repo_verified = True
+        st.session_state.repo_dir = f"{st.session_state.user_dir}/content/{repo_name}"
         st.session_state.repo_url = response.json().get('html_url', '')
         return True
     elif response.status_code == 404:
@@ -77,14 +78,16 @@ def convert_https_to_ssh(https_url: str) -> str:
         raise ValueError("Invalid GitHub HTTPS URL")
 
 def setup_github_repo():
+    init_github_vars()
     with st.spinner("Setting up repository..."):
         exists = check_github_repo_exists(st.session_state.repo_name)
         if exists:
             st.session_state.repo_verified = True
+            st.session_state.repo_dir = f"{st.session_state.user_dir}/content/{st.session_state.repo_name}"
             st.markdown("Repository already exists. Content will be overwritten.")
             st.session_state.repo_url = f"https://github.com/{st.session_state.github_org}/{st.session_state.repo_name}"
             print(f"Repository '{st.session_state.repo_name}' already exists. Content will be overwritten.")
-            return True
+            #return True
         elif not exists:
             # If repository does not exist, create it
             st.session_state.repo_verified = False
@@ -92,10 +95,11 @@ def setup_github_repo():
             repo_created = create_github_repo(st.session_state.repo_name)
             if repo_created:
                 st.session_state.repo_verified = True
+                st.session_state.repo_dir = f"{st.session_state.user_dir}/content/{st.session_state.repo_name}"
                 st.markdown("Repository created successfully.")
                 st.session_state.repo_url = f"https://github.com/{st.session_state.github_org}/{st.session_state.repo_name}"
                 print(f"Repository '{st.session_state.repo_name}' created successfully.")
-                return True
+                ###return True
             else:
                 st.session_state.repo_verified = False
                 st.session_state.repo_url = ""
@@ -104,21 +108,18 @@ def setup_github_repo():
     
     # Show repository link if verified
     if st.session_state.repo_verified and st.session_state.repo_url:
-        # st.markdown(f"Repository URL: [View Repository]({st.session_state.repo_url})", unsafe_allow_html=True)
-
         # Clone the repository if it exists
         try:
             if not st.session_state.repo_cloned:
                 # Use a spinner to indicate cloning process
-                st.session_state.uploaded_files = []  # Reset uploaded files list
-                st.session_state.repo_dir = ""  # Reset repo directory
-                # Create a temporary directory to clone the repository
                 with st.spinner("Cloning repository..."):
                     # Clone the repository to a temporary directory
+                    print(f"repo_name: {st.session_state.repo_name} and repo_dir : {st.session_state.repo_dir}")
                     time.sleep(5)
                     if not st.session_state.repo_dir:
                         ###temp_dir = tempfile.mkdtemp()
                         st.session_state.repo_dir = f"{st.session_state.user_dir}/content/{st.session_state.repo_name}"
+                        print(f"DEBUG: Set repo_dir to {st.session_state.repo_dir}")
                         st.session_state.repo_dir = Path(st.session_state.repo_dir)
                     if os.path.exists(st.session_state.repo_dir):
                         print(f"Directory {st.session_state.repo_dir} already exists, deleting the directory")
@@ -129,7 +130,7 @@ def setup_github_repo():
                     print(f"Repository is cloned at '{st.session_state.repo_dir}'")
                     st.session_state.uploaded_files = os.listdir(st.session_state.repo_dir)
                     add_log(f"Repository '{st.session_state.repo_name}' from url '{st.session_state.repo_url}' cloned successfully at '{st.session_state.repo_dir}'.")
-                    st.session_state.modules_dir = st.session_state.repo_dir / "modules"
+                    st.session_state.modules_dir = f"{st.session_state.repo_dir}/modules"
                     print(f"=====DEBUG: Set modules_dir to {st.session_state.modules_dir}")
                     st.session_state.repo_cloned = True
         except Exception as e:
@@ -138,21 +139,8 @@ def setup_github_repo():
             st.session_state.repo_verified = False
             st.session_state.repo_url = ""  
 
-        # # Show required structure for the course objectives
-        # st.markdown("""
-        # **Required Structure for Training Objectives:**
-                    
-        # - Use `=` for course heading
-        # - Use `==` for section headings
-        # - Use `-` for topics under sections
-        # """)
-
         st.session_state.chat_enabled = True
         
-        # # Enable the chat interface if repository is verified
-        # if not st.session_state.chat_enabled:
-        #     st.session_state.chat_enabled = True
-
 def push_to_github():
     """
     Push the changes to the GitHub repository.
@@ -194,7 +182,6 @@ def add_github_contributors(contributors_input: str):
     contributors = [c.strip() for c in contributors_input.replace(',', ' ').split() if c.strip()]
     if not contributors:
         st.info("No contributors provided.")
-        return
 
     headers = {
         "Authorization": f"token {st.session_state.github_token}",

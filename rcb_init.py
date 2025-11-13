@@ -14,7 +14,41 @@ def add_log(message: str):
     st.session_state.logs.append(f"[{timestamp}] {message}")
     print(f"LOG: {st.session_state.logs}")
 
+def display_top_banner():
+    load_dotenv()
+    top_banner_message = os.getenv("BANNER_MESSAGE", "🚀 Welcome to Rapid Course Builder!")
+    banner_markdown_text_1 = """
+        <style>
+            /* Create a fixed banner across the top of the page */
+            .stApp {
+                margin-top: 3rem;
+            }
+            .top-banner {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                background-color: #ffcc00;
+                color: black;
+                text-align: center;
+                font-weight: bold;
+                padding: 0.5rem;
+                z-index: 9999;
+                box-shadow: 0px 2px 6px rgba(0,0,0,0.1);
+            }
+        </style>
+        """
+    banner_markdown_text_2 = f"""
+        <div class="top-banner">
+            {top_banner_message}
+        </div>
+        """
+    banner_markdown_text = banner_markdown_text_1 + banner_markdown_text_2
+    st.markdown(banner_markdown_text,unsafe_allow_html=True)
+
+
 def init_page():
+    display_top_banner()
     load_dotenv()
     st.sidebar.info("Select a page above.")
     if 'data_dir' not in st.session_state:
@@ -53,22 +87,6 @@ def init_image_page():
         st.session_state.d2_image_code = ""
     if 'image_name' not in st.session_state:
         st.session_state.image_name = ""
-def reset_quickcourse_state():
-    st.session_state.update({
-        "show_logs": False,
-        "chat_enabled": True,
-        "repo_verified": False,
-        "course_outline": "",
-        "context_for_outline": "",
-        "topics_for_outline": "",
-        "context_from_rag": "",
-        "topic": "",
-        "antora_course_title": "",
-        "desc_chapters": [],
-        "modules_dir": "",
-        "course_outline_file": f"{st.session_state.user_dir}/TEMP-outline.adoc",
-        "course_structure_file_names": f"{st.session_state.user_dir}/TEMP-course_structure_file_names.csv",
-    })
     
 def init_quickcourse_page():
     if 'repo_verified' not in st.session_state:
@@ -78,7 +96,7 @@ def init_quickcourse_page():
     if 'repo_url' not in st.session_state:
         st.session_state.repo_url = ""
     if 'repo_dir' not in st.session_state:
-        st.session_state.repo_dir = "" 
+        st.session_state.repo_dir = f"{st.session_state.user_dir}/content/{st.session_state.repo_name}"
     if 'repo_cloned' not in st.session_state:
         st.session_state.repo_cloned = False
 
@@ -146,7 +164,7 @@ def init_quickcourse_vars():
     if 'desc_chapters' not in st.session_state:
         st.session_state.desc_chapters = []
     if 'modules_dir' not in st.session_state:
-        st.session_state.modules_dir = ""
+        st.session_state.modules_dir = f"{st.session_state.user_dir}/content/{st.session_state.repo_name}/modules/"
 
     # --- Configuration for jinja2 file to generate antora.yml---
     if 'course_outline_file' not in st.session_state:

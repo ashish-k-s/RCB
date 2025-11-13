@@ -40,9 +40,6 @@ def generate_rag_db(file_path):
 
         # Create/update retriever
         st.session_state.retriever = st.session_state.vectorstore.as_retriever(search_kwargs={"k": 4})
-
-        file_name = os.path.basename(file_path)
-        st.success(f"RAG db generated for file: {file_name}")        
         return True
     except Exception as e:
         st.error(f"Error during generating RAG db")
@@ -52,8 +49,6 @@ def generate_rag_db(file_path):
 # Helper to get retrieved context as a single string
 def retrieve_context(query: str, max_tokens: int = 1500) -> str:
     try:
-        if st.session_state.retriever is None or not query:
-            return ""
         docs = st.session_state.retriever.get_relevant_documents(query)
         print(f"DEBUG: RAG retrieved {len(docs)} documents for query: {query}")
         # Concatenate contents; optionally truncate to keep prompts reasonable
@@ -81,16 +76,17 @@ def process_uploaded_documents(uploaded_files):
         for i, uploaded_file in enumerate(uploaded_files):
             progress = (i + 1) / total_files
             progress_bar.progress(progress)
-            status_placeholder.text(f"Processing {uploaded_file.name}")
+            status_placeholder.text(f"Processing {i + 1} of {total_files}: {uploaded_file.name}")
             if not file_already_uploaded(uploaded_file):
                 print(f"File {uploaded_file.name} not available, will be saving it...")
                 ### Save uploaded file
                 file_path = save_uploaded_file(uploaded_file)
+                ### Generate RAG db for the uploaded file
+                st.toast(f"Generating RAG db for file: {uploaded_file.name}")
                 if generate_rag_db(file_path):
                     record_file_hash(file_path,"SUCCESS")
                 else:
                     record_file_hash(file_path,"FAILED")
-                process_file_for_rag(file_path)
                 processed_files += 1
                 ##time.sleep(1)
             else:
@@ -113,31 +109,8 @@ def save_uploaded_file(uploaded_file) -> str:
 
     return file_path
 
-# RAG: Build vector store and retriever per uploaded file, persisted on disk
-def process_file_for_rag(file_path):
-    loader = PyPDFLoader(file_path)
-    document = loader.load()
-    
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-    docs = text_splitter.split_documents(document)
-    
-    embeddings = OllamaEmbeddings(model="mxbai-embed-large")
-    db_dir = str(Path(f"{st.session_state.user_dir}/chroma").absolute())
-
-    # Initialize or update a single persistent vector store
-    if st.session_state.vectorstore is None:
-        db = Chroma.from_documents(docs, embedding=embeddings, persist_directory=db_dir)
-        st.session_state.vectorstore = db
-    else:
-        st.session_state.vectorstore.add_documents(docs)
-    
-    # Persist changes
-    st.session_state.vectorstore.persist()
-
-    # Create/update retriever
-    st.session_state.retriever = st.session_state.vectorstore.as_retriever(search_kwargs={"k": 4})
-
 def record_file_hash(file_path,status):
+    file_name = os.path.basename(file_path)
     hasher = hashlib.md5()
     with open(file_path, 'rb') as f:
         buf = f.read()
@@ -282,8 +255,6 @@ def read_chapter_list(course_structure_csv):
                         text = re.sub(r'(==|-)', '', row[0], count=1)
                         st.session_state.topic = text
                         f.write(f"# {text}")
-
-                        ## Build prompt and call llm to generate page summary
                         
                         # Retrieve RAG context for this chapter/topic
                         st.session_state.context_from_rag = retrieve_context(text)
@@ -295,9 +266,6 @@ def read_chapter_list(course_structure_csv):
                         print("PAGE SUMMARY: ", response)
                         f.write("\n\n")
                         f.write(response)
-                        # text = extract_code_blocks(response)
-                        # print("CODEBLOCK SUMMARY: ", text)
-                        # f.write(f"\n\n{text}")
 
                 if row and row[0].strip().startswith('-') and len(row) > 1:
                     section_name = row[1].strip()
@@ -307,7 +275,6 @@ def read_chapter_list(course_structure_csv):
                         st.session_state.topic = text
                         f.write(f"# {text}")
                         print(f"DEBUG: Topic text: {text}")
-                        ## Build prompt and call llm to generate page content
                         # Retrieve RAG context for this section/topic
                         st.session_state.context_from_rag = retrieve_context(text)
 
