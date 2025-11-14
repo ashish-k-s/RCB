@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 from langchain_openai import ChatOpenAI
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
-import google.generativeai as genai
+import google.genai as genai
 
 def add_log(message: str):
     """Add a message to the logs"""

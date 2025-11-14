@@ -1,6 +1,6 @@
 import streamlit as st
 from langchain_openai import ChatOpenAI
-import google.generativeai as genai
+import google.genai as genai
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -63,14 +63,17 @@ def call_llm_to_generate_response(model_choice: str, system_prompt: str, user_pr
 
     elif model_choice == "Gemini":
         print("USING GEMINI MODEL")
-        genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel(
-            model_name='gemini-2.5-flash',
-            system_instruction=system_prompt
-        )
-        response = model.generate_content(user_prompt)
 
-        # Print the generated text
+        prompt = f"{system_prompt}\n\n{user_prompt}"
+        client = genai.Client(
+            api_key=st.session_state.gemini_api_key
+        )
+
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
+
         print(response.text)
         return response.text
 

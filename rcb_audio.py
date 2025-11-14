@@ -118,7 +118,7 @@ def gemini_tts_wave_file(filename, pcm, channels=1, rate=24000, sample_width=2):
 
 def generate_audio_file_from_transcript_gemini_tts():
 
-    client = genai.Client(api_key="AIzaSyD4WT8YFM-RlvwTxRShsNR3L4ozxnt6Bxg")
+    client = genai.Client(api_key=st.session_state.gemini_api_key)
 
     if st.session_state.voice_type_mf == "Female":
         response = client.models.generate_content(
