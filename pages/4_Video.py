@@ -1,4 +1,5 @@
 # pip install python-pptx moviepy pyttsx3
+import shutil
 import streamlit as st
 from pptx import Presentation
 from pdf2image import convert_from_path
@@ -9,8 +10,8 @@ import os
 import glob
 from pathlib import Path
 
-from audio import create_audio_file_from_transcript
-from rcb_init import init_page
+from rcb_audio import generate_audio_file_from_transcript
+from rcb_init import init_audio_page, init_audio_prompts, init_audio_vars, init_page
 
 st.set_page_config(
     page_title="Video with RCB"
@@ -22,31 +23,38 @@ if 'current_page' not in st.session_state:
 st.session_state.current_page = "Video"
 
 init_page()
+init_audio_page()
+init_audio_vars()
+init_audio_prompts()
 
-audio_file_name_str = "rcb_generated_audio"
-if 'audio_file_path_wav' not in st.session_state:
-    st.session_state.audio_file_path_wav = '/tmp/' + audio_file_name_str + '.wav'
-if 'audio_file_path_mp3' not in st.session_state:
-    st.session_state.audio_file_path_mp3 = '/tmp/' + audio_file_name_str + '.mp3'
-if 'audio_file_path_txt' not in st.session_state:
-    st.session_state.audio_file_path_txt = '/tmp/' + audio_file_name_str + '.txt'
+
+# audio_file_name_str = "rcb_generated_audio"
+# if 'audio_file_path_wav' not in st.session_state:
+#     st.session_state.audio_file_path_wav = '{st.session_state.video_data_dir}/' + audio_file_name_str + '.wav'
+# if 'audio_file_path_mp3' not in st.session_state:
+#     st.session_state.audio_file_path_mp3 = '{st.session_state.video_data_dir}/' + audio_file_name_str + '.mp3'
+# if 'audio_file_path_txt' not in st.session_state:
+#     st.session_state.audio_file_path_txt = '{st.session_state.video_data_dir}/' + audio_file_name_str + '.txt'
+if 'video_data_dir' not in st.session_state:
+    st.session_state.video_data_dir = f"{st.session_state.user_dir}/video"
 if 'video_file_path' not in st.session_state:
-    st.session_state.video_file_path = '/tmp/rcb_generated_video.mp4'
+    st.session_state.video_file_path = f"{st.session_state.video_data_dir}/rcb_generated_video.mp4"
 if 'progress_logs' not in st.session_state:
     st.session_state.progress_logs = st.empty()
 
 def simple_video_creator():
-
     """
     Simple function to create video from images and audio files
     """
     st.session_state.progress_logs.info("Creating video from images and audio files... This may take a while, please wait.")
+
+    print(f"\nCreating video from images and audio files in directory: {st.session_state.video_data_dir}")
     # Get image files
-    pngs = glob.glob("/tmp/*.png")
+    pngs = glob.glob(f"{st.session_state.video_data_dir}/*.png")
     pngs.sort()
 
     # Get audio files
-    mp3s = glob.glob("/tmp/*.mp3")
+    mp3s = glob.glob(f"{st.session_state.video_data_dir}/*.mp3")
     mp3s.sort()
      
     # Print file names for debugging
@@ -168,7 +176,7 @@ def generate_video_from_pptx(uploaded_file):
     slides = convert_from_path("input.pdf", dpi=300)
     for i, slide in enumerate(slides, start=1):
         st.session_state.progress_logs.info(f"Saving slide {i} as image...")
-        slide.save(f"/tmp/{i}.png", "PNG")
+        slide.save(f"{st.session_state.video_data_dir}/{i}.png", "PNG")
 
     ## Extract speaker notes
     def extract_notes(pptx_file):
@@ -185,27 +193,30 @@ def generate_video_from_pptx(uploaded_file):
 
     for num, note in extract_notes("input.pptx"):
         st.session_state.progress_logs.info(f"Extracting notes from slide {num}...")
-        with open(f"/tmp/{num}.txt", "w") as f:
+        with open(f"{st.session_state.video_data_dir}/{num}.txt", "w") as f:
             f.write(note)
         st.session_state.curated_transcript = note
-        st.session_state.audio_file_path_txt = f"/tmp/{num}.txt"
-        st.session_state.audio_file_path_wav = f"/tmp/{num}.wav"
-        st.session_state.audio_file_path_mp3 = f"/tmp/{num}.mp3"
+        st.session_state.audio_file_path_txt = f"{st.session_state.video_data_dir}/{num}.txt"
+        st.session_state.audio_file_path_wav = f"{st.session_state.video_data_dir}/{num}.wav"
+        st.session_state.audio_file_path_mp3 = f"{st.session_state.video_data_dir}/{num}.mp3"
         st.session_state.progress_logs.info(f"Creating audio file for slide {num} from transcript")
         print(f"Creating audio file for slide {num} from transcript")
-        create_audio_file_from_transcript()
+        generate_audio_file_from_transcript()
+        shutil.copyfile(st.session_state.default_audio_file_path_wav, f"{st.session_state.video_data_dir}/{num}.wav")
+        shutil.copyfile(st.session_state.default_audio_file_path_mp3, f"{st.session_state.video_data_dir}/{num}.mp3")
+        shutil.copyfile(st.session_state.default_audio_file_path_txt, f"{st.session_state.video_data_dir}/{num}.txt")
 
     st.session_state.progress_logs.info("Slides and notes extracted successfully!")
     simple_video_creator()
 
     #def combine_audio_files_and_images():
-url = "https://docs.google.com/presentation/d/1jydJmOfPeyOhqiYBVQN1h8YP-spB228ozmIkaPfzwAQ/edit?usp=sharing"
+url = "https://docs.google.com/presentation/u/0/?ftv=1&tgif=d"
 
 instructions = st.empty()
 with instructions.container():
-    st.markdown("### Slide deck for video generation")
-    st.markdown("Use this Slide deck for video generation [link](%s)" % url)
-    st.markdown("Create copy of this slide and add your content with speaker notes.")
+    st.markdown("### Template slide deck for video generation")
+    st.markdown("Use any presentation template from [here](%s) for video generation " % url)
+    st.markdown("Create copy of selected template and add your content with speaker notes.")
     st.markdown("Download the slide in .pptx format and use it for generating video")
 
 # Sidebar on streamlit app

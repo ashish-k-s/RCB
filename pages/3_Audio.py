@@ -29,6 +29,8 @@ init_llm_vars()
 init_audio_vars()
 init_audio_prompts()
 
+st.session_state.use_default_prompts = True
+
 st.session_state.provided_transcript = st.text_area(
     "Write the audio transcript text to be curated here:",
     placeholder="Write the audio transcript text to be curated here...",
