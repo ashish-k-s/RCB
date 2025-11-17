@@ -24,7 +24,7 @@ def create_github_repo(repo_name) -> bool:
     payload = {
         "owner": st.session_state.github_org,
         "name": repo_name,
-        "description": "Repository created from template using script",
+        "description": "Repository created by RCB",
         "private": st.session_state.is_private,
         "include_all_branches": True
     }

@@ -246,7 +246,7 @@ def init_quickcourse_prompts():
             {st.session_state.topics_for_outline}
     """
 
-    st.session_state.system_prompt_page_summary = f"""
+    st.session_state.system_prompt_page_summary_pre = f"""
     You are a Content Developer, expert in providing short description for any given topic.
     Your task is to provide short explanation of provided topic.
 
@@ -256,59 +256,98 @@ def init_quickcourse_prompts():
     - Simplifying complex technical concepts into accessible explanations
     - Writing clear, concise, and short technical explanation on provided topic.
     - Do not include any introductory or closing text in your response.
+    """
 
+    if 'system_prompt_page_summary_user' not in st.session_state:
+        st.session_state.system_prompt_page_summary_user = ""
+
+    st.session_state.system_prompt_page_summary_post = f"""
     Use the provided context as your primary knowledge base. Reference it where appropriate to ensure accuracy and continuity.
 
-    You are currently assigned to work on the training content covering the below mentioned objectives:
+    You are currently assigned to work on the training content covering the below mentioned objectives.
+
+    OBJECTIVES:
 
     {st.session_state.course_outline}
 
-    Relevant context:
+    Below is the relevant context.
+
+    CONTEXT:
+
     {st.session_state.context_from_rag}
     """
 
-    st.session_state.user_prompt_page_summary = f"""
-    Keeping the whole list of objectives to be covered in mind, write short description (not more than 7 sentences) for the below topic:
+    st.session_state.system_prompt_page_summary = st.session_state.system_prompt_page_summary_pre + st.session_state.system_prompt_page_summary_user + st.session_state.system_prompt_page_summary_post
 
+
+    st.session_state.user_prompt_page_summary_1 = f"""
+    Keeping the whole list of objectives to be covered in mind, write short description for the below topic.
+
+    TOPIC:
     {st.session_state.topic}
 
     Stick to this mentioned topic in your response. If necessary, use Bullet points to list the key points.
 
     """
 
-    st.session_state.system_prompt_detailed_content = f"""
+    if 'user_prompt_page_summary_user' not in st.session_state:
+        st.session_state.user_prompt_page_summary_user = ""
+
+    st.session_state.user_prompt_page_summary = st.session_state.user_prompt_page_summary_1 + st.session_state.user_prompt_page_summary_user
+
+    st.session_state.system_prompt_detailed_content_pre = f"""
     You are a Content Architect, combining the roles of Technical Writer and Subject Matter Expert. 
     Your mission is to develop high-quality detailed educational content that is technically accurate, engaging, inclusive, and adaptable for different learning levels. 
     **You always write content in Antora AsciiDoc format.**
 
-    Your responsibilities include:
-    - Simplifying complex technical concepts into accessible explanations
-    - Writing clear, concise, and engaging content for diverse audiences
-    - Developing practical hands-on lab activities with real-world examples
-    - Providing expert-level insights and troubleshooting guidance
+    """
+    if 'system_prompt_detailed_content_user' not in st.session_state:
+        st.session_state.system_prompt_detailed_content_user = """    
+        Your responsibilities include:
+        - Simplifying complex technical concepts into accessible explanations
+        - Writing clear, concise, and engaging content for diverse audiences
+        - Developing practical hands-on lab activities with real-world examples
+        - Providing expert-level insights and troubleshooting guidance
 
-    When drafting content, always:
+        When drafting content, always:
 
-    1. Write **detailed technical explanation**
-    2. Incorporate step-by-step **hands-on activities** where applicable
+        1. Write **detailed technical explanation**
+        2. Incorporate step-by-step **hands-on activities** where applicable
 
+        """
+
+    st.session_state.system_prompt_detailed_content_post = f"""    
     Use the provided context as your primary knowledge base. Reference it where appropriate to ensure accuracy and continuity.
 
-    You are currently assigned to work on the training content covering the below mentioned objectives:
+    You are currently assigned to work on the training content covering the below mentioned objectives.
+
+    OBJECTIVES:
 
     {st.session_state.course_outline}
 
-    Relevant context:
+    Below is the relevant context.
+
+    CONTEXT:
+
     {st.session_state.context_from_rag}
     """
 
-    st.session_state.user_prompt_detailed_content = f"""
-    Keeping the whole list of objectives to be covered in mind, write content for the below topic:
+    st.session_state.system_prompt_detailed_content = st.session_state.system_prompt_detailed_content_pre + st.session_state.system_prompt_detailed_content_user + st.session_state.system_prompt_detailed_content_post
+
+    st.session_state.user_prompt_detailed_content_pre = f"""
+    Keeping the whole list of objectives to be covered in mind, write content for the below topic.
+
+    TOPIC:
 
     {st.session_state.topic}
 
     Stick to the mentioned topic in your response.
     """
+
+    if 'user_prompt_detailed_content_user' not in st.session_state:
+        st.session_state.user_prompt_detailed_content_user = ""
+
+    st.session_state.user_prompt_detailed_content = st.session_state.user_prompt_detailed_content_pre + st.session_state.user_prompt_detailed_content_user
 
 def init_audio_prompts():
     print("Initializing audio prompts...")

@@ -24,7 +24,10 @@ GEMINI_API_BASE = os.environ.get("GEMINI_API_BASE")
 #     )
 
 def call_llm_to_generate_response(model_choice: str, system_prompt: str, user_prompt: str):
-    print(f"\Generating response with... \nmodel_choice: {model_choice} \nsystem_prompt: {system_prompt} \nuser_prompt: {user_prompt}")
+    if not st.session_state.use_default_prompts:
+        print("Using custom prompts")
+        print("====================")
+    print(f"\nGenerating response with... \nmodel_choice: {model_choice} \nsystem_prompt: {system_prompt} \nuser_prompt: {user_prompt}")
     if model_choice == "MaaS":
         print("USING MODEL AS A SERVICE")
         llm = ChatOpenAI(

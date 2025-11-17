@@ -32,3 +32,7 @@ if st.button("Login"):
     st.session_state.disable_all = False
     print(f"Logged in as: {st.session_state.username}")
     st.rerun()
+
+with open("RCB Home.md", "r") as f:
+    markdown_content = f.read()
+st.markdown(markdown_content)

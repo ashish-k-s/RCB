@@ -168,6 +168,63 @@ with st.sidebar:
 
 if not st.session_state.show_logs: # Hide chat interface if logs are shown
     if st.session_state.chat_enabled:
+        st.session_state.use_default_prompts = st.checkbox("Use default prompts (Recommended)", value=True, disabled=st.session_state.show_logs)
+
+        if not st.session_state.use_default_prompts:
+            st.markdown("**Make sure you know what you are doing.**")
+            st.markdown("Feel free to contact us if you need any assistance with custom prompts.")
+            init_quickcourse_prompts()
+            with st.expander("Show/Hide prompts"):
+
+                st.markdown("**System prompt for generating section summary:**")
+                st.text(st.session_state.system_prompt_page_summary_pre)
+                st.session_state.system_prompt_page_summary_user = st.text_area(
+                    "User provided system prompt for page summary:", 
+                    height=100, 
+                    value=st.session_state.system_prompt_page_summary_user,
+                    disabled=False,
+                    label_visibility="collapsed"
+                )
+                st.text(st.session_state.system_prompt_page_summary_post)
+
+                st.divider()
+
+                st.markdown("**User prompt for generating section summary:**")
+                st.text(st.session_state.user_prompt_page_summary_1)
+                st.session_state.user_prompt_page_summary_user = st.text_area(
+                    "User provided text for user prompt for page summary:", 
+                    height=100, 
+                    value=st.session_state.user_prompt_page_summary_user,
+                    disabled=False,
+                    label_visibility="collapsed"
+                )
+
+                st.markdown("**System prompt for generating detailed content on page:**")
+                st.text(st.session_state.system_prompt_detailed_content_pre)
+                st.session_state.system_prompt_detailed_content_user = st.text_area(
+                    "User provided system prompt for page summary:", 
+                    height=100, 
+                    value=st.session_state.system_prompt_detailed_content_user,
+                    disabled=False,
+                    label_visibility="collapsed"
+                )
+                st.text(st.session_state.system_prompt_detailed_content_post)
+
+                st.divider()
+
+                st.markdown("**User prompt for generating detailed content on page:**")
+                st.text(st.session_state.user_prompt_detailed_content_pre)
+                st.session_state.user_prompt_detailed_content_user = st.text_area(
+                    "User provided user prompt for page summary:", 
+                    height=100, 
+                    value=st.session_state.user_prompt_detailed_content_user,
+                    disabled=False,
+                    label_visibility="collapsed"
+                )
+
+                st.divider()
+
+
         # Chat input box
         topics_outline = st.text_area(
             "Enter the list of training objectives to be covered:",
