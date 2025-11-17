@@ -161,7 +161,10 @@ def save_image_file():
     render_image_from_code()
 
 def init_image_vars():
+    print("Initializing image variables...")
     st.session_state.default_image_file_name_str = "rcb_generated_image"
+    if 'image_file_name_str' not in st.session_state:
+        st.session_state.image_file_name_str = st.session_state.default_image_file_name_str
     st.session_state.image_data_dir = f"{st.session_state.user_dir}/images/"
     st.session_state.default_image_file_path_png = f"{st.session_state.image_data_dir}/{st.session_state.default_image_file_name_str}.png"
     st.session_state.default_image_file_path_d2 = f"{st.session_state.image_data_dir}/{st.session_state.default_image_file_name_str}.d2"
@@ -216,7 +219,7 @@ def get_available_names(data_dir):
 def delete_image_files(base_name):
     if st.button("Yes"):
         """Delete all the image files for a given base name."""
-        for ext in [".d2", ".wav"]:
+        for ext in [".d2", ".png"]:
             path = os.path.join(st.session_state.image_data_dir, base_name + ext)
             if os.path.exists(path):
                 os.remove(path)
