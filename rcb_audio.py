@@ -208,10 +208,10 @@ def show_audio_files():
         return
 
     # Dropdown to select file base name
-    selected_name = st.selectbox("Select a file pair:", available_names)
+    st.session_state.selected_name = st.selectbox("Select audio file:", available_names)
 
-    txt_path = os.path.join(st.session_state.audio_data_dir, selected_name + ".txt")
-    wav_path = os.path.join(st.session_state.audio_data_dir, selected_name + ".wav")
+    txt_path = os.path.join(st.session_state.audio_data_dir, st.session_state.selected_name + ".txt")
+    wav_path = os.path.join(st.session_state.audio_data_dir, st.session_state.selected_name + ".wav")
 
     # Display text content
     if os.path.exists(txt_path):
@@ -225,7 +225,34 @@ def show_audio_files():
             audio_bytes = audio_file.read()
             st.audio(audio_bytes, format="audio/wav")
 
-    # Delete button
-    if st.button(f"Delete '{selected_name}' files"):
-        delete_audio_files(selected_name)
+    if st.session_state.selected_name:
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            # Download button for Audio file
+            with open(f"{st.session_state.audio_data_dir}/{st.session_state.selected_name}.wav", "rb") as audio_file:
+                audio_bytes = audio_file.read()
+            st.download_button(
+                label=f"Download Audio file for {st.session_state.selected_name}",
+                data=audio_bytes,
+                file_name=st.session_state.selected_name + ".wav",
+                mime="audio/wav"
+            )
+            
+        with col2:
+            # Download button for transcript text file
+            with open(f"{st.session_state.audio_data_dir}/{st.session_state.selected_name}.txt", "rb") as text_file:
+                text_bytes = text_file.read()
+            st.download_button(
+                label=f"Download Transcript for {st.session_state.selected_name}",
+                data=text_bytes,
+                file_name=st.session_state.selected_name + ".txt",
+                mime="text/plain"
+            )
+
+        with col3:
+            # Delete button for both files
+            if st.button(f"Delete files for {st.session_state.selected_name}"):
+                delete_audio_files(st.session_state.selected_name)
+
 

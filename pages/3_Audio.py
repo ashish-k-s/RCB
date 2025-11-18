@@ -9,7 +9,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_community.llms import Ollama
 from langchain_core.output_parsers import StrOutputParser
 
-from rcb_audio import generate_audio_file_from_transcript, curate_transcript_text, show_audio_files, update_curated_transcript, save_audio_file
+from rcb_audio import generate_audio_file_from_transcript, curate_transcript_text, show_audio_files, update_curated_transcript, save_audio_file, delete_audio_files
 from rcb_init import init_audio_vars, init_audio_page, init_audio_prompts, init_page, init_llm_vars
 from rcb_llm_manager import call_llm_to_generate_response
 
@@ -79,5 +79,6 @@ st.markdown("### Audio files available:")
 # Directory where audio files are located
 if os.path.exists(st.session_state.audio_data_dir):
     show_audio_files()
+
 else:
     st.info("No audio files found. Please generate and save an audio file to see it listed here.")

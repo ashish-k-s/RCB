@@ -201,11 +201,31 @@ def show_image_files():
     if os.path.exists(png_path):
         with open(png_path, "rb") as image_file:
             image_bytes = image_file.read()
-            st.image(image_bytes, caption="Saved Image", use_container_width=True)
+            st.image(image_bytes, caption="Image Preview", use_container_width=True)
 
-    # Delete button
-    if st.button(f"Delete '{selected_name}' files"):
-        delete_image_files(selected_name)
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        # Download button for PNG image
+        st.download_button(
+            label=f"Download PNG for {selected_name}",
+            data=image_bytes,
+            file_name=selected_name + ".png",
+            mime="image/png"
+        )
+    with col2:
+        # Download button for D2 code     
+        st.download_button(
+            label=f"Download D2 Code for {selected_name}",
+            data=text_content,
+            file_name=selected_name + ".d2",
+            mime="text/plain"
+        )
+
+    with col3:
+        # Delete button for both files
+        if st.button(f"Delete files for {selected_name}"):
+            delete_image_files(selected_name)
 
 
 def get_available_names(data_dir):
