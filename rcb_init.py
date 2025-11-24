@@ -179,6 +179,11 @@ def init_quickcourse_vars():
         st.session_state.antora_pb_file = f"{st.session_state.user_dir}/content/{st.session_state.repo_name}/antora-playbook.yml"
 
 def init_audio_page():
+    sample_gemini_female = "sample/F-gemini.wav"
+    sample_gemini_male = "sample/M-gemini.wav"
+    sample_piper_female = "sample/F-piper.wav"
+    sample_piper_male = "sample/M-piper.wav"
+
     st.session_state.tts_choice = st.sidebar.selectbox(
     "Choose TTS Model",
     options=["PiperTTS", "GeminiTTS"],
@@ -191,6 +196,21 @@ def init_audio_page():
         index=0,
         disabled=st.session_state.disable_all
     )
+    st.sidebar.markdown("### Sample Voice")
+    if st.session_state.tts_choice == "GeminiTTS":
+        st.sidebar.markdown("Involves usage costs on Google Cloud.")
+        if st.session_state.voice_type_mf == "Female":
+            st.sidebar.audio(sample_gemini_female, format="audio/wav", start_time=0)
+        else:
+            st.sidebar.audio(sample_gemini_male, format="audio/wav", start_time=0)
+
+    elif st.session_state.tts_choice == "PiperTTS":
+        st.sidebar.markdown("Open-source TTS model with no usage costs.")
+        if st.session_state.voice_type_mf == "Female":
+            st.sidebar.audio(sample_piper_female, format="audio/wav", start_time=0)
+        else:
+            st.sidebar.audio(sample_piper_male, format="audio/wav", start_time=0)
+
 
 def init_audio_vars():
     st.session_state.default_audio_file_name_str = "rcb_generated_audio"
