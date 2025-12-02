@@ -13,7 +13,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_community.llms import Ollama
 from langchain_core.output_parsers import StrOutputParser
 
-from rcb_init import init_page, init_llm_vars
+from rcb_init import init_page, init_llm_vars, init_image_page
 from rcb_llm_manager import call_llm_to_generate_response
 
 st.set_page_config(
@@ -27,18 +27,10 @@ st.session_state.current_page = "Image"
 
 init_page()
 init_llm_vars()
+init_image_page()
 
 st.session_state.use_default_prompts = True
 
-d2_image_name_str = "rcb_generated_image"
-if 'd2_image_path' not in st.session_state:
-    st.session_state.d2_image_path = st.session_state.user_dir + "/images/" + d2_image_name_str + '.png'
-if 'd2_code_path' not in st.session_state:
-    st.session_state.d2_code_path = st.session_state.user_dir + "/images/" + d2_image_name_str + '.d2'
-if 'd2_image_code' not in st.session_state:
-    st.session_state.d2_image_code = ""
-if 'user_prompt' not in st.session_state:
-    st.session_state.user_prompt = ""
 
 
 st.session_state.system_prompt_generate_image = """
@@ -175,7 +167,7 @@ def show_image_files():
         return
 
     # Dropdown to select file base name
-    selected_name = st.selectbox("Select a file pair:", available_names)
+    selected_name = st.selectbox("Select Image:", available_names)
 
     d2_path = os.path.join(st.session_state.image_data_dir, selected_name + ".d2")
     png_path = os.path.join(st.session_state.image_data_dir, selected_name + ".png")
@@ -223,7 +215,6 @@ def show_image_files():
 #     png_files = {os.path.splitext(f)[0] for f in os.listdir(data_dir) if f.endswith(".png")}
 #     return sorted(d2_files & png_files)
 
-import os
 
 def get_available_names(data_dir):
     """Return a sorted list of base filenames (without extension)
@@ -265,62 +256,79 @@ GEMINI_API_BASE = os.environ.get("GEMINI_API_BASE")
 
 init_image_vars()
 
-user_prompt_text = st.text_area(
-    "Write detailed description for the image to be generated:",
-    placeholder="Write the description of the image to be generated here...",
-    height=30,
-    key="user_prompt_text",
-    disabled=st.session_state.disable_all
-)
-
-print(f"User directory: {st.session_state.user_dir}")
-generate_image = st.button("Generate Image code", disabled=st.session_state.disable_all)
-
-st.session_state.d2_image_code = st.text_area(
-   "Write or edit your d2lang code here:",
-    placeholder="Write your d2lang code here...",
-    value=st.session_state.d2_image_code,
-    height=300,
-    key="st.session_state.d2_image_code",
-    on_change=update_d2_image_code,
-    disabled=st.session_state.disable_all
+def render_image_generation_ui():
+    user_prompt_text = st.text_area(
+        "Write detailed description for the image to be generated:",
+        placeholder="Write the description of the image to be generated here...",
+        height=30,
+        key="user_prompt_text",
+        disabled=st.session_state.disable_all
     )
 
-col1, col2, col3 = st.columns(3)
+    print(f"User directory: {st.session_state.user_dir}")
+    generate_image = st.button("Generate Image code", disabled=st.session_state.disable_all)
 
-with col1:        
-    render_image = st.button("Render Image", disabled=st.session_state.disable_all)
+    st.session_state.d2_image_code = st.text_area(
+    "Write or edit your d2lang code here:",
+        placeholder="Write your d2lang code here...",
+        value=st.session_state.d2_image_code,
+        height=300,
+        key="st.session_state.d2_image_code",
+        on_change=update_d2_image_code,
+        disabled=st.session_state.disable_all
+        )
 
-with col2:
-    st.session_state.image_file_name_str = st.text_input(" ", placeholder="Image file name (without extension) here" , key="st.session_state.image_file_name_str", label_visibility="collapsed", disabled=st.session_state.disable_all)
+    col1, col2, col3, col4 = st.columns(4)
 
-with col3:
-    save_image = st.button("Save Image", disabled=not bool(st.session_state.image_file_name_str))
+    with col1:        
+        render_image = st.button("Render Image", disabled=st.session_state.disable_all)
 
-if save_image:
-    save_image_file()
+    with col2:
+        st.session_state.image_file_name_str = st.text_input(" ", placeholder="Image file name (without extension) here" , key="st.session_state.image_file_name_str", label_visibility="collapsed", disabled=st.session_state.disable_all)
 
+    with col3:
+        save_image = st.button("Save Image", disabled=not bool(st.session_state.image_file_name_str))
 
-if generate_image:
-    st.session_state.user_prompt = user_prompt_text
-    print(f"Generating image code for User Prompt: {st.session_state.user_prompt}")    
-    if not st.session_state.user_prompt.strip():
-        st.warning("Please enter a description for the image to be generated.")
-        st.stop()
+    with col4:
+        clear_all = st.button("Clear All", disabled=st.session_state.disable_all)
 
-    st.session_state.user_prompt_generate_image = f"""
-    Generate the D2 code for the following diagram description:  
-    {st.session_state.user_prompt}
+    if save_image:
+        save_image_file()
 
-    """
-    generate_image_code()
-    #render_image_from_code()
+    if clear_all:
+        st.session_state.d2_image_code = ""
+        st.session_state.user_prompt = ""
+        st.session_state.image_file_name_str = ""
+        update_d2_image_code()
 
-if render_image:
-    render_image_from_code()
+    if generate_image:
+        st.session_state.user_prompt = user_prompt_text
+        print(f"Generating image code for User Prompt: {st.session_state.user_prompt}")    
+        if not st.session_state.user_prompt.strip():
+            st.warning("Please enter a description for the image to be generated.")
+            st.stop()
 
-# Directory where image files are located
-if os.path.exists(st.session_state.image_data_dir):
-    show_image_files()
+        st.session_state.user_prompt_generate_image = f"""
+        Generate the D2 code for the following diagram description:  
+        {st.session_state.user_prompt}
+
+        """
+        generate_image_code()
+        #render_image_from_code()
+
+    if render_image:
+        render_image_from_code()
+
+def render_image_viewing_ui():
+    # Directory where image files are located
+    if os.path.exists(st.session_state.image_data_dir):
+        show_image_files()
+    else:
+        st.info("No image files found. Please generate and save an image file to see it listed here.")
+
+if st.session_state.image_action == "Generate new Images":
+    st.subheader("Generate New Image using RCB")
+    render_image_generation_ui()
 else:
-    st.info("No image files found. Please generate and save an image file to see it listed here.")
+    st.subheader("View Existing Images in your account")
+    render_image_viewing_ui()

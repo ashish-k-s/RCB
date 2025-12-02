@@ -81,13 +81,7 @@ def init_page():
         st.session_state.progress_logs = st.empty()
 
     print(f"User: {st.session_state.username}, User Dir: {st.session_state.user_dir}, Data Dir: {st.session_state.data_dir}")
-      
-def init_image_page():
-    if 'd2_image_code' not in st.session_state:
-        st.session_state.d2_image_code = ""
-    if 'image_name' not in st.session_state:
-        st.session_state.image_name = ""
-    
+          
 def init_quickcourse_page():
     if 'repo_verified' not in st.session_state:
         st.session_state.repo_verified = False
@@ -103,6 +97,29 @@ def init_quickcourse_page():
     if 'logs' not in st.session_state:
         st.session_state.logs = []
 
+def init_image_page():
+
+    d2_image_name_str = "rcb_generated_image"
+    if 'd2_image_code' not in st.session_state:
+        st.session_state.d2_image_code = ""
+    if 'image_name' not in st.session_state:
+        st.session_state.image_name = ""
+    if 'd2_image_path' not in st.session_state:
+        st.session_state.d2_image_path = st.session_state.user_dir + "/images/" + d2_image_name_str + '.png'
+    if 'd2_code_path' not in st.session_state:
+        st.session_state.d2_code_path = st.session_state.user_dir + "/images/" + d2_image_name_str + '.d2'
+    if 'd2_image_code' not in st.session_state:
+        st.session_state.d2_image_code = ""
+    if 'user_prompt' not in st.session_state:
+        st.session_state.user_prompt = ""
+    if 'image_action' not in st.session_state:
+        st.session_state.image_action = "Generate new Images"
+    st.session_state.image_action = st.sidebar.radio(
+            "Choose Image Action",
+            options=["Generate new Images", "View existing Images"],
+            index=0,
+            disabled=st.session_state.disable_all
+        )
 
 def init_llm_vars():
     load_dotenv()
@@ -124,7 +141,7 @@ def init_llm_vars():
 
     st.session_state.model_choice = st.sidebar.selectbox(
         "Choose LLM Model",
-        options=["MaaS", "Gemini", "Local"],
+        options=["MaaS", "Gemini"],
         index=0,
         disabled=st.session_state.disable_all
     )
