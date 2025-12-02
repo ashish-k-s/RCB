@@ -14,7 +14,6 @@ import os
 import base64
 import struct
 
-
 def curate_transcript_text():
     #st.session_state.audio_file_name_str = "rcb_generated_audio"
     init_audio_vars()
@@ -38,7 +37,7 @@ def update_curated_transcript():
     print(f"WRITING CONTENT TO FILE: {st.session_state.default_audio_file_path_txt} \n CONTENT: \n {st.session_state.curated_transcript}")
     with open(st.session_state.default_audio_file_path_txt, "w") as f:
         f.write(st.session_state.curated_transcript)
-    st.rerun()
+    #st.rerun()
 
 def save_audio_file():
     init_audio_vars()
@@ -55,20 +54,23 @@ def save_audio_file():
     st.success(f"File for {st.session_state.audio_file_name_str} saved successfully!")
 
 def generate_audio_file_from_transcript():
+    if st.session_state.curated_transcript:
+        update_curated_transcript()
+
     if st.session_state.tts_choice == "PiperTTS":
         generate_audio_file_from_transcript_piper_tts()
     elif st.session_state.tts_choice == "GeminiTTS":
         generate_audio_file_from_transcript_gemini_tts()
 
 def generate_audio_file_from_transcript_piper_tts():
-    if st.session_state.curated_transcript:
-        with open(st.session_state.default_audio_file_path_txt, "w") as f:
-            f.write(st.session_state.curated_transcript)
+        # with open(st.session_state.default_audio_file_path_txt, "w") as f:
+        #     f.write(st.session_state.curated_transcript)
 
         # cat 00.txt | piper -m en_US-danny-low.onnx -c en_US-danny-low.onnx.json -f 00.wav
         with open(st.session_state.default_audio_file_path_txt, "r") as f:
             text_input = f.read()
 
+        print(f"st.session_state.default_audio_file_path_wav: {st.session_state.default_audio_file_path_wav}")
         if st.session_state.voice_type_mf == "Female":
             result = subprocess.run(
                 ["piper", "-m", "en_US-hfc_female-medium.onnx", "-c", "en_US-hfc_female-medium.onnx.json", "-f", st.session_state.default_audio_file_path_wav],
@@ -117,9 +119,11 @@ def gemini_tts_wave_file(filename, pcm, channels=1, rate=24000, sample_width=2):
 
 
 def generate_audio_file_from_transcript_gemini_tts():
-
     client = genai.Client(api_key=st.session_state.gemini_api_key)
-
+    print(f"st.session_state.default_audio_file_path_txt: {st.session_state.default_audio_file_path_txt}")
+    with open(st.session_state.default_audio_file_path_txt, "r") as f:
+        st.session_state.curated_transcript = f.read()
+    init_audio_prompts()
     if st.session_state.voice_type_mf == "Female":
         response = client.models.generate_content(
         model="gemini-2.5-flash-preview-tts",
