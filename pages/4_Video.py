@@ -42,6 +42,15 @@ if 'video_file_path' not in st.session_state:
 if 'progress_logs' not in st.session_state:
     st.session_state.progress_logs = st.empty()
 
+def clear_old_files():
+    """
+    Clear old files in the video data directory
+    """
+    if os.path.exists(st.session_state.video_data_dir):
+        shutil.rmtree(st.session_state.video_data_dir)
+    os.makedirs(st.session_state.video_data_dir, exist_ok=True)
+    st.session_state.progress_logs.info("Cleared old files in video data directory.")
+    
 def simple_video_creator():
     """
     Simple function to create video from images and audio files
@@ -235,5 +244,6 @@ if uploaded_file:
     if process_file_button:
         print(f"UPLOADED FILES:\n {uploaded_file}")
         instructions.empty()
+        clear_old_files()
         generate_video_from_pptx(uploaded_file)
 

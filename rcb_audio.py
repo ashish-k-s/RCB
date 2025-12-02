@@ -4,6 +4,8 @@ import streamlit as st
 import subprocess
 import shutil
 
+from streamlit import text_input
+
 from rcb_init import init_audio_vars, init_audio_prompts
 from rcb_llm_manager import call_llm_to_generate_response
 
@@ -34,6 +36,7 @@ def curate_transcript_text():
         update_curated_transcript()
 
 def update_curated_transcript():
+    print("Updating curated transcript file...")
     print(f"WRITING CONTENT TO FILE: {st.session_state.default_audio_file_path_txt} \n CONTENT: \n {st.session_state.curated_transcript}")
     with open(st.session_state.default_audio_file_path_txt, "w") as f:
         f.write(st.session_state.curated_transcript)
@@ -54,6 +57,7 @@ def save_audio_file():
     st.success(f"File for {st.session_state.audio_file_name_str} saved successfully!")
 
 def generate_audio_file_from_transcript():
+    print(f"Generating audio file from transcript...")
     if st.session_state.curated_transcript:
         update_curated_transcript()
 
@@ -63,6 +67,7 @@ def generate_audio_file_from_transcript():
         generate_audio_file_from_transcript_gemini_tts()
 
 def generate_audio_file_from_transcript_piper_tts():
+        print("Generating audio file using Piper TTS...")
         # with open(st.session_state.default_audio_file_path_txt, "w") as f:
         #     f.write(st.session_state.curated_transcript)
 
@@ -119,6 +124,7 @@ def gemini_tts_wave_file(filename, pcm, channels=1, rate=24000, sample_width=2):
 
 
 def generate_audio_file_from_transcript_gemini_tts():
+    print("Generating audio file using Gemini TTS...")
     client = genai.Client(api_key=st.session_state.gemini_api_key)
     print(f"st.session_state.default_audio_file_path_txt: {st.session_state.default_audio_file_path_txt}")
     with open(st.session_state.default_audio_file_path_txt, "r") as f:
@@ -173,6 +179,17 @@ def generate_audio_file_from_transcript_gemini_tts():
 
     print(f"\nSaving sample rate: {rate}")
     gemini_tts_wave_file(st.session_state.default_audio_file_path_wav, data, rate=rate)
+
+    result = subprocess.run(
+        ["ffmpeg", "-y", "-i", st.session_state.default_audio_file_path_wav, st.session_state.default_audio_file_path_mp3],
+        input=st.session_state.curated_transcript,
+        text=True,
+        capture_output=True
+    )
+    #print(f"Result of ffmpeg command: {result}")
+    if result.returncode != 0:
+        st.warning(f"Conversion to mp3 failed: \n {result.stderr}")
+        return
 
     st.audio(st.session_state.default_audio_file_path_wav)
 
