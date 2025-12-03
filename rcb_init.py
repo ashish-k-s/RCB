@@ -68,6 +68,7 @@ def init_page():
         os.makedirs(st.session_state.temp_dir, exist_ok=True)
         os.makedirs(f"{st.session_state.user_dir}/audio", exist_ok=True)
         os.makedirs(f"{st.session_state.user_dir}/video", exist_ok=True)
+        os.makedirs(f"{st.session_state.user_dir}/saved_videos", exist_ok=True)
         os.makedirs(f"{st.session_state.user_dir}/images", exist_ok=True)
     else:
         if st.session_state.current_page != "Home":

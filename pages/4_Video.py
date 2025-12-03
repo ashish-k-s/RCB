@@ -27,14 +27,6 @@ init_audio_page()
 init_audio_vars()
 init_audio_prompts()
 
-
-# audio_file_name_str = "rcb_generated_audio"
-# if 'audio_file_path_wav' not in st.session_state:
-#     st.session_state.audio_file_path_wav = '{st.session_state.video_data_dir}/' + audio_file_name_str + '.wav'
-# if 'audio_file_path_mp3' not in st.session_state:
-#     st.session_state.audio_file_path_mp3 = '{st.session_state.video_data_dir}/' + audio_file_name_str + '.mp3'
-# if 'audio_file_path_txt' not in st.session_state:
-#     st.session_state.audio_file_path_txt = '{st.session_state.video_data_dir}/' + audio_file_name_str + '.txt'
 if 'video_data_dir' not in st.session_state:
     st.session_state.video_data_dir = f"{st.session_state.user_dir}/video"
 if 'video_file_path' not in st.session_state:
@@ -135,27 +127,10 @@ def simple_video_creator():
         )
         
         print("Video created successfully!")
+        st.session_state.video_generated = True
         st.session_state.progress_logs.success("Video created successfully!")
-        st.markdown("### Preview")
-        st.video(st.session_state.video_file_path)
-
-        try:
-            with open(st.session_state.video_file_path, "rb") as file:
-                video_bytes = file.read()
-
-            st.download_button(
-                label="Download Video",
-                data=video_bytes,
-                file_name="rcb_generated_video.mp4",
-                mime="video/mp4"
-            )
-        except FileNotFoundError:
-            st.error(f"Error: The video file '{video_file_path}' was not found.")
-        except Exception as e:
-            st.error(f"An error occurred: {e}")
-
-        st.markdown("Note:: When you click the Download button, the video will disappear from the page. This is normal behavior. You can still save the file to your device.")
-
+        # st.markdown("### Preview")
+        # st.video(st.session_state.video_file_path)
 
     except Exception as e:
         print(f"✗ Error creating final video: {e}")
@@ -247,3 +222,36 @@ if uploaded_file:
         clear_old_files()
         generate_video_from_pptx(uploaded_file)
 
+if st.session_state.get("video_generated", True):
+    st.button("Generate New Video", on_click=lambda: st.session_state.update({"video_generated": False}))
+    st.markdown("### Preview")
+    st.video(st.session_state.video_file_path)
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1: 
+        try:
+            with open(st.session_state.video_file_path, "rb") as file:
+                video_bytes = file.read()
+
+            st.download_button(
+                label="Download Video",
+                data=video_bytes,
+                file_name="rcb_generated_video.mp4",
+                mime="video/mp4"
+            )
+        except FileNotFoundError:
+            st.error(f"Error: The video file '{video_file_path}' was not found.")
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
+
+    with col2:
+        st.session_state.video_file_name_str = st.text_input(" ", placeholder="video file name (without extension) here" , key="st.session_state.video_file_name_str", label_visibility="collapsed", disabled=st.session_state.disable_all)
+
+    with col3:
+        save_video = st.button("Save video", disabled=not bool(st.session_state.video_file_name_str))
+
+    if save_video:
+        dest_path = f"{st.session_state.user_dir}/saved_videos/{st.session_state.video_file_name_str}.mp4"
+        shutil.copyfile(st.session_state.video_file_path, dest_path)
+        st.success(f"File for {st.session_state.video_file_name_str} saved successfully!")
