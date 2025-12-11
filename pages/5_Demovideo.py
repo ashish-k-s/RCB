@@ -7,7 +7,7 @@ from datetime import timedelta
 import subprocess
 
 from rcb_init import init_page
-from moviepy import VideoFileClip, concatenate_videoclips
+from moviepy import VideoFileClip, concatenate_videoclips, AudioFileClip, CompositeAudioClip
 
 st.title("Build Your Demovideo with RCB")
 if 'current_page' not in st.session_state:
@@ -25,7 +25,7 @@ if "current_timestamp" not in st.session_state:
 if "action_str" not in st.session_state:
     st.session_state.action_str = "Trim"
 if "action_text" not in st.session_state:
-    st.session_state.action_text = "Trim"
+    st.session_state.action_text = ""
 if 'selected_index' not in st.session_state:
     st.session_state.selected_index = 0
 if 'trim_selected' not in st.session_state:
@@ -53,9 +53,9 @@ def set_action(selected_option):
 # Display the selected video with JavaScript and other streamlit controls
 ## if st.session_state.selected_file_path and os.path.exists(st.session_state.selected_file_path):
 try:
-    video_files = [f for f in os.listdir(f"{st.session_state.user_dir}/saved_videos") if f.endswith(".webm")]
+    video_files = [f for f in os.listdir(f"{st.session_state.user_dir}/saved_videos") if f.endswith(".mp4")]
 except FileNotFoundError:
-    st.sidebar.info("No demo video found. Please upload a .webm video file.")
+    st.sidebar.info("No demo video found. Please upload a .mp4 video file.")
 
 def update_action(action_str=""):
     print(f"Updating action with: {action_str}")
@@ -78,7 +78,14 @@ def display_trim_options():
 def display_speed_options():
     pass
 def display_dub_options():
-    pass
+    try:
+        audio_files = [f for f in os.listdir(f"{st.session_state.user_dir}/audio") if f.endswith(".wav")]
+    except FileNotFoundError:
+        st.info("No audio files found. Please generate required audio files using Audio feature of this tool.")
+
+    selected_audio_file = st.selectbox("Select audio file to dub:", audio_files)
+    if st.button("Use selected file"):
+        update_action(selected_audio_file)
 
 def remove_multiple_sections(video_path, cuts, output_path):
     clip = VideoFileClip(video_path)
@@ -92,6 +99,69 @@ def remove_multiple_sections(video_path, cuts, output_path):
     clips.append(clip.subclipped(last, clip.duration))  # final segment
     final = concatenate_videoclips(clips)
     final.write_videofile(output_path)
+
+def dub_multiple_audios(video_path, dubbings, output_path):
+    """
+    Dub multiple audio clips into a video at given timestamps.
+
+    Args:
+        video_path (str): Path to input video.
+        dubbings (list): List of tuples [(audio_file, start_time), ...].
+                         start_time can be in seconds or 'hh:mm:ss' format.
+        output_path (str): Path to save final video.
+    """
+    # Load video
+    video = VideoFileClip(video_path)
+    base_audio = video.audio
+
+    # Collect all audio layers
+    audio_layers = [base_audio]
+
+    # Helper to convert hh:mm:ss to seconds
+    def to_seconds(t):
+        if isinstance(t, (int, float)):
+            return t
+        h, m, s = map(float, t.split(':'))
+        return h * 3600 + m * 60 + s
+
+    # Add each new dubbing layer
+    for start_time, audio_file in dubbings:
+        audio_path = st.session_state.user_dir + "/audio/" + audio_file
+        start_sec = to_seconds(start_time)
+        new_audio = AudioFileClip(audio_path).with_start(start_sec)
+        audio_layers.append(new_audio)
+
+    # Combine all audio layers
+    final_audio = CompositeAudioClip(audio_layers)
+
+    # Merge with video and export
+    final = video.with_audio(final_audio)
+    final.write_videofile(output_path, codec="libx264", audio_codec="aac")
+
+    # Cleanup
+    video.close()
+    final.close()
+
+dubbings = [
+    ("00:00:10", "wrh-pm.wav"),
+    ("00:01:05", "wibm-pm.wav"),
+    (5, "w-pm.wav"),   # You can also pass seconds directly
+]
+
+def process_trim_actions():
+    timestamps_to_trim = [tuple(line.split()) for line in st.session_state.action_text.splitlines() if line.strip()]
+
+    print(timestamps_to_trim)
+
+    remove_multiple_sections(st.session_state.selected_file_path, timestamps_to_trim, generate_video_file_path)
+    st.success(f"Video generated and saved as {generate_video_file_name}.mp4")
+                
+def process_dub_actions():
+    dubbings = []
+    for line in st.session_state.action_text.strip().splitlines():
+        time_part, file_part = line.split(maxsplit=1)
+        dubbings.append((time_part, file_part))
+    dub_multiple_audios(st.session_state.selected_file_path, dubbings, generate_video_file_path)
 
 def seconds_to_hhmmss_timedelta(seconds):
     """Converts seconds to hh:mm:ss format using timedelta, discarding fractions."""
@@ -116,7 +186,7 @@ if video_files:
     html_code = f"""
     <div style="margin: 0px; padding: 0px;">
     <video id="myVideo" width="640" height="360" controls>
-        <source src="data:video/webm;base64,{b64_video}" type="video/webm">
+        <source src="data:video/mp4;base64,{b64_video}" type="video/mp4">
         Your browser does not support the video tag.
     </video>
     <button onclick="showTimestamp()">Get Current Time</button>
@@ -172,12 +242,6 @@ if video_files:
         action = st.selectbox("Action Type:", options, index=st.session_state.selected_index, disabled=st.session_state.get("disable_all"))
         set_action(action)
     with col2:
-        if st.session_state.trim_selected:
-            display_trim_options()
-        elif st.session_state.speed_selected:
-            display_speed_options()
-        elif st.session_state.dub_selected:
-            display_dub_options()
         get_timestamp = st.button("Get Current timestamp")
         add_action = st.button("Add action", on_click=add_action)
 
@@ -188,10 +252,14 @@ if video_files:
             st.session_state.current_timestamp = "00:00"
         update_action(st.session_state.current_timestamp + " ")
 
+    with col3:
+        if st.session_state.trim_selected:
+            display_trim_options()
+        elif st.session_state.speed_selected:
+            display_speed_options()
+        elif st.session_state.dub_selected:
+            display_dub_options()
 
-    # with col3:
-    #     get_audio_file = st.button("audio file",key="get_audio_file",disabled=st.session_state.get("cut_disabled"))
-    #     audio_file = st.selectbox("Select Audio:", options=["audio1.mp3", "audio2.mp3", "audio3.mp3"], label_visibility="collapsed",key="audio_file",disabled=st.session_state.get("cut_disabled"))
 
     # Render the text actions
     st.session_state.action_text = st.text_area("Actions:", placeholder="Enter text for actions here...", height=300, value=st.session_state.action_text)
@@ -210,25 +278,22 @@ if video_files:
         generate_video = st.button("Generate Video",disabled=not generate_video_file_name)
     
     if generate_video and generate_video_file_name:
-        print(f"Generating video file: {generate_video_file_name}.webm")
-        generate_video_file_path = os.path.join(f"{st.session_state.user_dir}/saved_videos", generate_video_file_name + ".webm")
+        print(f"Generating video file: {generate_video_file_name}.mp4")
+        generate_video_file_path = os.path.join(f"{st.session_state.user_dir}/saved_videos", generate_video_file_name + ".mp4")
 
         if st.session_state.action_text:
             if st.session_state.action_str == "Trim":
-                timestamps_to_trim = [tuple(line.split()) for line in st.session_state.action_text.splitlines() if line.strip()]
+                process_trim_actions()
+            if st.session_state.action_str == "Dub":
+                process_dub_actions()
 
-                print(timestamps_to_trim)
-
-                remove_multiple_sections(st.session_state.selected_file_path, timestamps_to_trim, generate_video_file_path)
-                st.success(f"Video generated and saved as {generate_video_file_name}.webm")
-                
 else:
-    st.sidebar.info("No demo video found. Please upload a .webm video file.")
+    st.sidebar.info("No demo video found. Please upload a .mp4 video file.")
 
-st.sidebar.subheader("Upload your demo video (.webm)")
+st.sidebar.subheader("Upload your demo video (.mp4)")
 uploaded_file = st.sidebar.file_uploader(
     "Upload Demo Video",
-    type=['webm'],
+    type=['mp4'],
     accept_multiple_files=False,
     help="Upload your demo video file.",
     disabled=st.session_state.disable_all
