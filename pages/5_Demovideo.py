@@ -8,6 +8,7 @@ import subprocess
 
 from rcb_init import init_page
 from moviepy import VideoFileClip, concatenate_videoclips, AudioFileClip, CompositeAudioClip
+import moviepy.video.fx as vfx
 
 st.title("Build Your Demovideo with RCB")
 if 'current_page' not in st.session_state:
@@ -76,7 +77,10 @@ def clear_actions():
 def display_trim_options():
     pass
 def display_speed_options():
-    pass
+    speed = st.number_input("Speed Factor:", min_value=0.1, max_value=10.0, value=1.5, step=0.5)
+    if st.button("Use this speed"):
+        st.session_state.action_text += f"{speed}"
+
 def display_dub_options():
     try:
         audio_files = [f for f in os.listdir(f"{st.session_state.user_dir}/audio") if f.endswith(".wav")]
@@ -148,6 +152,73 @@ dubbings = [
     (5, "w-pm.wav"),   # You can also pass seconds directly
 ]
 
+def apply_speed_segments(video_path, speed_instructions, output_path):
+    """
+    Apply speed changes to multiple parts of a video.
+    
+    speed_instructions: list of strings
+        Format: "start end speed"
+        Example: "0:00:05 0:00:11 2"
+    """
+    
+    def to_seconds(t):
+        """Convert hh:mm:ss → seconds (also supports mm:ss or seconds)."""
+        if isinstance(t, (int, float)):
+            return t
+        parts = t.split(":")
+        parts = [float(p) for p in parts]
+        if len(parts) == 3:
+            h, m, s = parts
+            return h*3600 + m*60 + s
+        elif len(parts) == 2:
+            m, s = parts
+            return m*60 + s
+        else:
+            return float(parts[0])
+
+    clip = VideoFileClip(video_path)
+    timeline = []
+
+    # Sort instructions by start time
+    parsed = []
+    for line in speed_instructions:
+        start, end, speed = line.split()
+        parsed.append((to_seconds(start), to_seconds(end), float(speed)))
+    parsed.sort(key=lambda x: x[0])
+
+    last_end = 0
+
+    # Build segments in order
+    for start, end, speed in parsed:
+        # normal segment before speed-up
+        if start > last_end:
+            timeline.append(clip.subclipped(last_end, start))
+
+        # speed-modified segment
+        sped = clip.subclipped(start, end).with_effects([
+            vfx.MultiplySpeed(factor=speed)
+        ])
+        timeline.append(sped)
+
+        last_end = end
+
+    # Remaining tail of video
+    if last_end < clip.duration:
+        timeline.append(clip.subclipped(last_end, clip.duration))
+
+    # Concatenate all parts
+    final = concatenate_videoclips(timeline)
+    final.write_videofile(output_path, codec="libx264", audio_codec="aac")
+
+    clip.close()
+    final.close()
+
+speed_rules = [
+    "0:00:05 0:00:11 2",
+    "0:00:17 0:00:24 3"
+]
+
+
 def process_trim_actions():
     timestamps_to_trim = [tuple(line.split()) for line in st.session_state.action_text.splitlines() if line.strip()]
 
@@ -155,7 +226,19 @@ def process_trim_actions():
 
     remove_multiple_sections(st.session_state.selected_file_path, timestamps_to_trim, generate_video_file_path)
     st.success(f"Video generated and saved as {generate_video_file_name}.mp4")
-                
+
+def process_speed_actions():
+    speed_instructions = []
+    for line in st.session_state.action_text.strip().splitlines():
+        start, end, speed = line.split()
+        speed_instructions.append(f"{start} {end} {speed}")
+
+    apply_speed_segments(
+        st.session_state.selected_file_path,
+        speed_instructions,
+        generate_video_file_path
+    )
+
 def process_dub_actions():
     dubbings = []
     for line in st.session_state.action_text.strip().splitlines():
@@ -239,7 +322,7 @@ if video_files:
 
     with col1:
         options = ["Trim", "Speed", "Dub"]
-        action = st.selectbox("Action Type:", options, index=st.session_state.selected_index, disabled=st.session_state.get("disable_all"))
+        action = st.selectbox("Action Type:", options, index=st.session_state.selected_index, disabled=st.session_state.get("disable_all"), on_change=clear_actions)
         set_action(action)
     with col2:
         get_timestamp = st.button("Get Current timestamp")
@@ -286,7 +369,9 @@ if video_files:
                 process_trim_actions()
             if st.session_state.action_str == "Dub":
                 process_dub_actions()
-
+            if st.session_state.action_str == "Speed":
+                process_speed_actions()
+        st.success(f"Video generated and saved as {generate_video_file_name}.mp4")
 else:
     st.sidebar.info("No demo video found. Please upload a .mp4 video file.")
 
