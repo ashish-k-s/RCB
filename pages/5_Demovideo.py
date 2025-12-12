@@ -10,8 +10,6 @@ from rcb_init import init_page
 from moviepy import VideoFileClip, concatenate_videoclips, AudioFileClip, CompositeAudioClip
 import moviepy.video.fx as vfx
 
-import speed
-
 st.title("Build Your Demovideo with RCB")
 if 'current_page' not in st.session_state:
     st.session_state.current_page = "DemoVideo"
