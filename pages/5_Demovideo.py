@@ -10,6 +10,8 @@ from rcb_init import init_page
 from moviepy import VideoFileClip, concatenate_videoclips, AudioFileClip, CompositeAudioClip
 import moviepy.video.fx as vfx
 
+import speed
+
 st.title("Build Your Demovideo with RCB")
 if 'current_page' not in st.session_state:
     st.session_state.current_page = "DemoVideo"
@@ -37,22 +39,13 @@ if 'speed_selected' in st.session_state:
     st.session_state.speed_disabled = False
 
 def set_action(selected_option):
-    # if st.session_state.action_text != "":
-    #     if not clear_actions():
-    #         return
     st.session_state.action_str = selected_option
-    if st.session_state.action_str == "Trim":
-        st.session_state.selected_index = 0
-    elif st.session_state.action_str == "Speed":
-        st.session_state.selected_index = 1
-    elif st.session_state.action_str == "Dub":
-        st.session_state.selected_index = 2
     st.session_state.trim_selected = (selected_option == "Trim")
     st.session_state.speed_selected = (selected_option == "Speed")
+    st.session_state.freeze_selected = (selected_option == "Freeze")
     st.session_state.dub_selected = (selected_option == "Dub")
+    st.session_state.join_selected = (selected_option == "Join")
 
-# Display the selected video with JavaScript and other streamlit controls
-## if st.session_state.selected_file_path and os.path.exists(st.session_state.selected_file_path):
 try:
     video_files = [f for f in os.listdir(f"{st.session_state.user_dir}/saved_videos") if f.endswith(".mp4")]
 except FileNotFoundError:
@@ -74,12 +67,33 @@ def clear_actions():
     else:
         return False
 
+def display_common_options():
+    def add_action():
+        st.session_state.num_actions += 1
+        update_action("\n")
+
+    get_timestamp = st.button("Get Current timestamp")
+    add_action = st.button("Add action", on_click=add_action)
+
+    if get_timestamp:
+        try:
+            st.session_state.current_timestamp = seconds_to_hhmmss_timedelta(float(st.session_state.current_timestamp.strip()))
+            st.session_state.current_timestamp = st.session_state.current_timestamp + "    "
+        except ValueError:
+            st.session_state.current_timestamp = "00:00"
+        update_action(st.session_state.current_timestamp + " ")
+
 def display_trim_options():
     pass
 def display_speed_options():
     speed = st.number_input("Speed Factor:", min_value=0.1, max_value=10.0, value=1.5, step=0.5)
     if st.button("Use this speed"):
         st.session_state.action_text += f"{speed}"
+
+def display_freeze_options():
+    freeze = st.number_input("Freeze Duration:", min_value=0.1, max_value=10.0, value=1.5, step=0.5)
+    if st.button("Use this freeze duration"):
+        st.session_state.action_text += f"{freeze}"
 
 def display_dub_options():
     try:
@@ -90,6 +104,12 @@ def display_dub_options():
     selected_audio_file = st.selectbox("Select audio file to dub:", audio_files)
     if st.button("Use selected file"):
         update_action(selected_audio_file)
+
+def display_join_options():
+    video_file_join = st.selectbox("Select the file to join:", video_files)
+    video_file_path = os.path.join(f"{st.session_state.user_dir}/saved_videos", video_file_join)
+    if st.button("Add this video to join list"):
+        update_action( video_file_join + "\n" )
 
 def remove_multiple_sections(video_path, cuts, output_path):
     clip = VideoFileClip(video_path)
@@ -213,11 +233,65 @@ def apply_speed_segments(video_path, speed_instructions, output_path):
     clip.close()
     final.close()
 
-speed_rules = [
-    "0:00:05 0:00:11 2",
-    "0:00:17 0:00:24 3"
-]
+def freeze_video_segments(video_path, freeze_instructions, output_path):
+    """
+    Freeze the video at given timestamps for given durations.
 
+    freeze_instructions: list of strings
+        Format: "timestamp freeze_duration"
+        Example: "0:00:10 2"
+    """
+
+    def to_seconds(t):
+        """Convert hh:mm:ss, mm:ss, or ss → seconds."""
+        if isinstance(t, (int, float)):
+            return t
+        parts = t.split(":")
+        parts = [float(p) for p in parts]
+        if len(parts) == 3:
+            h, m, s = parts
+            return h*3600 + m*60 + s
+        elif len(parts) == 2:
+            m, s = parts
+            return m*60 + s
+        else:
+            return float(parts[0])
+
+    clip = VideoFileClip(video_path)
+    timeline = []
+
+    # Parse & sort freeze instructions
+    parsed = []
+    for inst in freeze_instructions:
+        ts, dur = inst.split()
+        parsed.append((to_seconds(ts), float(dur)))
+    parsed.sort(key=lambda x: x[0])
+
+    last_end = 0
+
+    for freeze_time, freeze_duration in parsed:
+
+        # Normal part before freeze
+        if freeze_time > last_end:
+            timeline.append(clip.subclipped(last_end, freeze_time))
+
+        # Get the exact frame to freeze
+        frozen_frame = clip.to_ImageClip(freeze_time).with_duration(freeze_duration)
+
+        timeline.append(frozen_frame)
+
+        last_end = freeze_time
+
+    # Add remaining tail of video
+    if last_end < clip.duration:
+        timeline.append(clip.subclipped(last_end, clip.duration))
+
+    # Concatenate final timeline
+    final = concatenate_videoclips(timeline)
+    final.write_videofile(output_path, codec="libx264", audio_codec="aac")
+
+    clip.close()
+    final.close()
 
 def process_trim_actions():
     timestamps_to_trim = [tuple(line.split()) for line in st.session_state.action_text.splitlines() if line.strip()]
@@ -225,7 +299,6 @@ def process_trim_actions():
     print(timestamps_to_trim)
 
     remove_multiple_sections(st.session_state.selected_file_path, timestamps_to_trim, generate_video_file_path)
-    st.success(f"Video generated and saved as {generate_video_file_name}.mp4")
 
 def process_speed_actions():
     speed_instructions = []
@@ -238,6 +311,28 @@ def process_speed_actions():
         speed_instructions,
         generate_video_file_path
     )
+
+def process_freeze_actions():
+    freeze_instructions = []
+    for line in st.session_state.action_text.strip().splitlines():
+        ts, dur = line.split()
+        freeze_instructions.append(f"{ts} {dur}")
+
+    freeze_video_segments(
+        st.session_state.selected_file_path,
+        freeze_instructions,
+        generate_video_file_path
+    )
+
+def process_join_actions():
+    video_files_to_join = [line.strip() for line in st.session_state.action_text.strip().splitlines() if line.strip()]
+    clips = []
+    for vf in video_files_to_join:
+        video_path = os.path.join(f"{st.session_state.user_dir}/saved_videos", vf)
+        clips.append(VideoFileClip(video_path))
+    final = concatenate_videoclips(clips)
+    final.write_videofile(generate_video_file_path, codec="libx264", audio_codec="aac")
+    final.close()
 
 def process_dub_actions():
     dubbings = []
@@ -306,46 +401,46 @@ if video_files:
     components.html(code, height=400, width=700, scrolling=True,)
     value = bridge("currentTime", default="")
     st.session_state.current_timestamp = value
-    ## st.session_state["echo_value"] = st.session_state.current_timestamp
-    ## st.text_input("Streamlit input (from JS)", key="echo_value")
-    ## st.session_state.action_text += st.session_state.current_timestamp
 
     if "num_actions" not in st.session_state:
         st.session_state.num_actions = 1  # start with one
 
-    def add_action():
-        st.session_state.num_actions += 1
-        update_action("\n")
 
     # Button to add new text action
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        options = ["Trim", "Speed", "Dub"]
+        options = ["Trim", "Speed", "Freeze", "Dub", "Join"]
         action = st.selectbox("Action Type:", options, index=st.session_state.selected_index, disabled=st.session_state.get("disable_all"), on_change=clear_actions)
         set_action(action)
     with col2:
-        get_timestamp = st.button("Get Current timestamp")
-        add_action = st.button("Add action", on_click=add_action)
-
-    if get_timestamp:
-        try:
-            st.session_state.current_timestamp = seconds_to_hhmmss_timedelta(float(st.session_state.current_timestamp.strip()))
-        except ValueError:
-            st.session_state.current_timestamp = "00:00"
-        update_action(st.session_state.current_timestamp + " ")
+        if st.session_state.trim_selected or st.session_state.speed_selected or st.session_state.freeze_selected or st.session_state.dub_selected:
+            display_common_options()
+        if st.session_state.join_selected:
+            display_join_options()
 
     with col3:
         if st.session_state.trim_selected:
             display_trim_options()
         elif st.session_state.speed_selected:
             display_speed_options()
+        elif st.session_state.freeze_selected:
+            display_freeze_options()
         elif st.session_state.dub_selected:
             display_dub_options()
 
+    if st.session_state.trim_selected:
+        actions_format_text = "Trim Action Format:    start_time    end_time    (one per line)\nExample:\n00:00:10    00:00:20\n00:01:00    00:01:15"
+    elif st.session_state.speed_selected:
+        actions_format_text = "Speed Action Format:    start_time    end_time    speed_factor (one per line)\nExample:\n00:00:10    00:00:20    2.0\n00:01:00    00:01:15    0.5"
+    elif st.session_state.freeze_selected:
+        actions_format_text = "Freeze Action Format:    timestamp    freeze_duration (one per line)\nExample:\n00:00:10    2.0\n00:01:00    1.5"
+    elif st.session_state.dub_selected:
+        actions_format_text = "Dub Action Format:    timestamp    audio_file_name (one per line)\nExample:\n00:00:10    wrh-pm.wav\n00:01:00    audio-file-name.wav"
+    elif st.session_state.join_selected:
+        actions_format_text = "Join Action Format:    video_file_name (one per line)\nExample:\nvideo1.mp4\nvideo2.mp4"
 
-    # Render the text actions
-    st.session_state.action_text = st.text_area("Actions:", placeholder="Enter text for actions here...", height=300, value=st.session_state.action_text)
+    st.session_state.action_text = st.text_area("Actions:", placeholder=actions_format_text, height=300, value=st.session_state.action_text)
 
     if st.button("Clear all Actions"):
         clear_actions()
@@ -371,6 +466,11 @@ if video_files:
                 process_dub_actions()
             if st.session_state.action_str == "Speed":
                 process_speed_actions()
+            if st.session_state.action_str == "Freeze":
+                process_freeze_actions()
+            if st.session_state.action_str == "Join":
+                process_join_actions()
+
         st.success(f"Video generated and saved as {generate_video_file_name}.mp4")
 else:
     st.sidebar.info("No demo video found. Please upload a .mp4 video file.")
