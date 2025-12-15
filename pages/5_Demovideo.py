@@ -148,7 +148,9 @@ def dub_multiple_audios(video_path, dubbings, output_path):
     base_audio = video.audio
 
     # Collect all audio layers
-    audio_layers = [base_audio]
+    audio_layers = []
+    if base_audio is not None:
+        audio_layers.append(base_audio)
 
     # Helper to convert hh:mm:ss to seconds
     def to_seconds(t):
@@ -164,11 +166,17 @@ def dub_multiple_audios(video_path, dubbings, output_path):
         new_audio = AudioFileClip(audio_path).with_start(start_sec)
         audio_layers.append(new_audio)
 
-    # Combine all audio layers
-    final_audio = CompositeAudioClip(audio_layers)
+    # Combine all audio layers only if there are any
+    if audio_layers:
+        final_audio = CompositeAudioClip(audio_layers)
+    else:
+        final_audio = None
 
     # Merge with video and export
-    final = video.with_audio(final_audio)
+    if final_audio is not None:
+        final = video.with_audio(final_audio)
+    else:
+        final = video
     final.write_videofile(output_path, codec="libx264", audio_codec="aac")
 
     # Cleanup
