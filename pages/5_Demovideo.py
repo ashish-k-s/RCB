@@ -100,7 +100,7 @@ def display_speed_options():
         st.session_state.action_text += f"{speed}"
 
 def display_freeze_options():
-    freeze = st.number_input("Freeze Duration:", min_value=0.1, max_value=10.0, value=1.5, step=0.5)
+    freeze = st.number_input("Freeze Duration (in seconds):", min_value=1, value=5, step=5)
     if st.button("Use this freeze duration"):
         st.session_state.action_text += f"{freeze}"
 
