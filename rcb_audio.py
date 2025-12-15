@@ -16,6 +16,8 @@ import os
 import base64
 import struct
 
+from moviepy import AudioFileClip
+
 def curate_transcript_text():
     #st.session_state.audio_file_name_str = "rcb_generated_audio"
     init_audio_vars()
@@ -34,6 +36,7 @@ def curate_transcript_text():
         # st.write(response)
         st.session_state.curated_transcript = response
         update_curated_transcript()
+        st.rerun()
 
 def update_curated_transcript():
     print("Updating curated transcript file...")
@@ -44,17 +47,23 @@ def update_curated_transcript():
 
 def save_audio_file():
     init_audio_vars()
-    print(f"SAVING AUDIO FILE AS: {st.session_state.audio_file_name_str}")
+    audio_clip = AudioFileClip(st.session_state.default_audio_file_path_wav)
+    duration_seconds = audio_clip.duration
+    new_audio_file_name_str = f"{st.session_state.audio_file_name_str}_{int(duration_seconds)}"
+    print(f"SAVING AUDIO FILE: {st.session_state.audio_file_name_str} AS: {new_audio_file_name_str}")
+    new_audio_path_txt = os.path.join(st.session_state.audio_data_dir, new_audio_file_name_str + ".txt")
+    new_audio_path_wav = os.path.join(st.session_state.audio_data_dir, new_audio_file_name_str + ".wav")
     print(f"DEFAULT AUDIO FILE PATH TXT: {st.session_state.default_audio_file_path_txt}")
     print(f"DEFAULT AUDIO FILE PATH WAV: {st.session_state.default_audio_file_path_wav}")
     print(f"AUDIO FILE PATH TXT: {st.session_state.audio_file_path_txt}")
     print(f"AUDIO FILE PATH WAV: {st.session_state.audio_file_path_wav}")
     if st.session_state.audio_file_name_str:
         with st.spinner("Saving audio file..."):
-            shutil.copyfile(st.session_state.default_audio_file_path_txt, st.session_state.audio_file_path_txt)
-            shutil.copyfile(st.session_state.default_audio_file_path_wav, st.session_state.audio_file_path_wav)
+            shutil.copyfile(st.session_state.default_audio_file_path_txt, new_audio_path_txt)
+            shutil.copyfile(st.session_state.default_audio_file_path_wav, new_audio_path_wav)
             # shutil.copyfile(st.session_state.default_audio_file_path_mp3, st.session_state.audio_file_path_mp3)
-    st.success(f"File for {st.session_state.audio_file_name_str} saved successfully!")
+    st.success(f"Saved {new_audio_file_name_str}! Duration (seconds) has been appended to the filename.")
+
 
 def generate_audio_file_from_transcript():
     print(f"Generating audio file from transcript...")
