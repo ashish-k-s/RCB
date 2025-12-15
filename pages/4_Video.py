@@ -11,7 +11,7 @@ import glob
 from pathlib import Path
 
 from rcb_audio import generate_audio_file_from_transcript
-from rcb_init import init_audio_page, init_audio_prompts, init_audio_vars, init_page
+from rcb_init import init_audio_page, init_audio_prompts, init_audio_vars, init_page, init_llm_vars
 
 st.set_page_config(
     page_title="Video with RCB"
@@ -20,12 +20,15 @@ st.set_page_config(
 st.title("Create Video using RCB")
 if 'current_page' not in st.session_state:
     st.session_state.current_page = "Video"
+if 'video_generated' not in st.session_state:
+    st.session_state.video_generated = False
 st.session_state.current_page = "Video"
 
 init_page()
 init_audio_page()
 init_audio_vars()
 init_audio_prompts()
+init_llm_vars()
 
 if 'video_data_dir' not in st.session_state:
     st.session_state.video_data_dir = f"{st.session_state.user_dir}/video"
