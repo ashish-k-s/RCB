@@ -65,6 +65,17 @@ def clear_actions():
     else:
         return False
 
+@st.dialog("Are you sure you want to delete this video? This can't be undone.")
+def ask_delete_confirmation():    
+    if st.button("Yes"):
+        """Delete selected video file."""
+        path = os.path.join(f"{st.session_state.user_dir}/saved_videos", st.session_state.selected_file_name)
+        if os.path.exists(path):
+            os.remove(path)
+        st.rerun()
+    else:
+        pass
+
 def display_common_options():
     def add_action():
         st.session_state.num_actions += 1
@@ -353,6 +364,17 @@ if video_files:
     st.session_state.selected_file_name = st.sidebar.selectbox("Choose a file:", video_files)
     st.session_state.selected_file_path = os.path.join(f"{st.session_state.user_dir}/saved_videos", st.session_state.selected_file_name)
     st.sidebar.info(f"Selected file: {st.session_state.selected_file_name}")
+
+    if st.sidebar.button("Delete selected video"):
+        if ask_delete_confirmation():
+            try:
+                os.remove(st.session_state.selected_file_path)
+                st.sidebar.success(f"Deleted file: {st.session_state.selected_file_name}")
+                st.session_state.selected_file_name = ""
+                st.session_state.selected_file_path = ""
+                st.rerun()
+            except Exception as e:
+                st.sidebar.error(f"Error deleting file: {e}")
 
     with open(st.session_state.selected_file_path, "rb") as f:
         video_bytes = f.read()
