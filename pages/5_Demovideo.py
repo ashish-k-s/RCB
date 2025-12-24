@@ -1,3 +1,4 @@
+from glob import glob
 import shutil
 import streamlit as st
 import streamlit.components.v1 as components
@@ -436,7 +437,7 @@ def process_join_actions(directory, video_files_to_join):
         print("Only one video file found, moving...")
         video_file = f"{directory}/{video_files_to_join[0]}"
         print("Moving", video_file, "to", generate_video_file_path)
-        shutil.move(video_file, generate_video_file_path)
+        shutil.copy2(video_file, generate_video_file_path)
     else:
         clips = []
         for vf in video_files_to_join:
@@ -445,6 +446,11 @@ def process_join_actions(directory, video_files_to_join):
         final = concatenate_videoclips(clips)
         final.write_videofile(generate_video_file_path, codec="libx264", audio_codec="aac")
         final.close()
+    mp4_files_to_delete = glob("*.mp4", root_dir=directory)
+    print("Deleting temporary files:", mp4_files_to_delete)
+    for file in mp4_files_to_delete:
+        print("Deleting", f"{directory}/{file}")
+        os.remove(f"{directory}/{file}")
 
 def process_dub_actions():
     dubbings = []
