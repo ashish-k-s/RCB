@@ -1,3 +1,4 @@
+import shutil
 import streamlit as st
 import streamlit.components.v1 as components
 from st_bridge import bridge
@@ -5,6 +6,7 @@ import base64
 import os
 from datetime import timedelta
 import subprocess
+from pathlib import Path
 
 from rcb_init import init_page
 from moviepy import VideoFileClip, concatenate_videoclips, AudioFileClip, CompositeAudioClip
@@ -120,18 +122,97 @@ def display_join_options():
     if st.button("Add this video to join list"):
         update_action( video_file_join + "\n" )
 
-def remove_multiple_sections(video_path, cuts, output_path):
-    clip = VideoFileClip(video_path)
-    clips = []
-    last = 0
+def ts_to_seconds(ts):
+    parts = ts.split(":")
+    parts = [float(p) for p in parts]
 
-    for start, end in cuts:
-        clips.append(clip.subclipped(last, start))
-        last = end
+    if len(parts) == 3:      # HH:MM:SS
+        h, m, s = parts
+        return h * 3600 + m * 60 + s
+    elif len(parts) == 2:    # MM:SS
+        m, s = parts
+        return m * 60 + s
+    else:                    # SS
+        return parts[0]
 
-    clips.append(clip.subclipped(last, clip.duration))  # final segment
-    final = concatenate_videoclips(clips)
-    final.write_videofile(output_path)
+def seconds_to_ts(seconds):
+    seconds = float(seconds)
+
+    h = int(seconds // 3600)
+    seconds %= 3600
+    m = int(seconds // 60)
+    s = seconds % 60
+
+    # Format seconds: remove trailing .0 if it's an integer
+    if s.is_integer():
+        s = int(s)
+
+    if h > 0:
+        return f"{h}:{m:02d}:{s:02d}" if isinstance(s, int) else f"{h}:{m:02d}:{s:05.2f}"
+    elif m > 0:
+        return f"{m}:{s:02d}" if isinstance(s, int) else f"{m}:{s:05.2f}"
+    else:
+        return str(s)
+
+def get_video_duration(video_path):
+    cmd = [
+        "ffprobe", "-v", "error",
+        "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1",
+        video_path
+    ]
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, text=True)
+    return float(result.stdout.strip())
+
+def build_keep_segments(cut_segments, total_duration):
+    keep = []
+    current = 0
+
+    for start_ts, end_ts in cut_segments:
+        start = ts_to_seconds(start_ts)
+        end = ts_to_seconds(end_ts)
+        if current < start:
+            keep.append((current, start))
+        current = end
+
+    if current < total_duration:
+        keep.append((current, total_duration))
+
+    return keep
+
+def remove_multiple_sections(video_path, cut_segments):
+    """
+    Remove multiple sections from a video.
+
+    Args:
+        video_path (str): Path to input video.
+        cut_segments (list): List of tuples [(start_time, end_time), ...].
+                      start_time and end_time can be in seconds or 'hh:mm:ss' format.
+    command:
+        TRIM PART OF FILE
+        ffmpeg -ss 00:00:00 -i input.mp4 -to 01:42:40 -c copy output1.mp4
+        TRIM LAST PART OF FILE
+        ffmpeg -ss 02:43:07 -i input.mp4 -c copy output3.mp4
+    """
+    total_duration = get_video_duration(video_path)
+    print("cut_segments:", cut_segments)
+    keep_segments = build_keep_segments(cut_segments, total_duration)
+    print("keep_segments:", keep_segments)
+    video_file_count = 1
+    for line in keep_segments:
+        print(f"Cut segment: {line}")
+        start, end = line
+        print(f"Start: {start}, End: {end}")
+        start_ts = seconds_to_ts(start)
+        end_ts = seconds_to_ts(end)
+        if end == "":
+            command = f"ffmpeg -i {video_path} -ss {start_ts} -c:v libx264 -c:a aac {st.session_state.user_temp_dir}/{video_file_count}.mp4"
+        else:
+            command = f"ffmpeg -i {video_path} -ss {start_ts} -to {end_ts} -c:v libx264 -c:a aac {st.session_state.user_temp_dir}/{video_file_count}.mp4"
+        print(f"Command: {command}")
+        video_file_count += 1
+        os.system(command)
+
 
 def dub_multiple_audios(video_path, dubbings, output_path):
     """
@@ -220,7 +301,7 @@ def apply_speed_segments(video_path, speed_instructions, output_path):
     parsed = []
     for line in speed_instructions:
         start, end, speed = line.split()
-        parsed.append((to_seconds(start), to_seconds(end), float(speed)))
+        parsed.append((ts_to_seconds(start), ts_to_seconds(end), float(speed)))
     parsed.sort(key=lambda x: x[0])
 
     last_end = 0
@@ -315,7 +396,15 @@ def process_trim_actions():
 
     print(timestamps_to_trim)
 
-    remove_multiple_sections(st.session_state.selected_file_path, timestamps_to_trim, generate_video_file_path)
+    remove_multiple_sections(st.session_state.selected_file_path, timestamps_to_trim)
+
+    video_files_dir = Path(st.session_state.user_temp_dir)
+
+    mp4_video_files = sorted([f.name for f in video_files_dir.glob("*.mp4")])
+
+    print(mp4_video_files)
+    process_join_actions(video_files_dir, mp4_video_files)
+
 
 def process_speed_actions():
     speed_instructions = []
@@ -341,15 +430,21 @@ def process_freeze_actions():
         generate_video_file_path
     )
 
-def process_join_actions():
-    video_files_to_join = [line.strip() for line in st.session_state.action_text.strip().splitlines() if line.strip()]
-    clips = []
-    for vf in video_files_to_join:
-        video_path = os.path.join(f"{st.session_state.user_dir}/saved_videos", vf)
-        clips.append(VideoFileClip(video_path))
-    final = concatenate_videoclips(clips)
-    final.write_videofile(generate_video_file_path, codec="libx264", audio_codec="aac")
-    final.close()
+def process_join_actions(directory, video_files_to_join):
+    print("Videos to join:", video_files_to_join)
+    if len(video_files_to_join) == 1:
+        print("Only one video file found, moving...")
+        video_file = f"{directory}/{video_files_to_join[0]}"
+        print("Moving", video_file, "to", generate_video_file_path)
+        shutil.move(video_file, generate_video_file_path)
+    else:
+        clips = []
+        for vf in video_files_to_join:
+            video_path = os.path.join(directory, vf)
+            clips.append(VideoFileClip(video_path))
+        final = concatenate_videoclips(clips)
+        final.write_videofile(generate_video_file_path, codec="libx264", audio_codec="aac")
+        final.close()
 
 def process_dub_actions():
     dubbings = []
@@ -497,7 +592,9 @@ if video_files:
             if st.session_state.action_str == "Freeze":
                 process_freeze_actions()
             if st.session_state.action_str == "Join":
-                process_join_actions()
+                video_files_to_join = [line.strip() for line in st.session_state.action_text.strip().splitlines() if line.strip()]
+                directory = f"{st.session_state.user_dir}/saved_videos"
+                process_join_actions(directory, video_files_to_join)
 
         st.success(f"Video generated and saved as {generate_video_file_name}.mp4")
 else:

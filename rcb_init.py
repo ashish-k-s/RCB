@@ -55,17 +55,16 @@ def init_page():
         st.session_state.data_dir = os.getenv("DATA_DIR", "/tmp/rcb_data") 
     if 'user_dir' not in st.session_state:
         st.session_state.user_dir = ""
-    if 'temp_dir' not in st.session_state:
-        st.session_state.temp_dir = f"{st.session_state.data_dir}/temp"
     if 'username' not in st.session_state:
         st.session_state.username = ""
         st.session_state.disable_all = True
     if st.session_state.username:
         st.sidebar.success(f"Logged in as: {st.session_state.username}")
         st.session_state.user_dir = f"{st.session_state.data_dir}/{st.session_state.username}"
+        st.session_state.user_temp_dir = f"{st.session_state.user_dir}/temp"
         st.session_state.disable_all = False
         os.makedirs(st.session_state.user_dir, exist_ok=True)
-        os.makedirs(st.session_state.temp_dir, exist_ok=True)
+        os.makedirs(st.session_state.user_temp_dir, exist_ok=True)
         os.makedirs(f"{st.session_state.user_dir}/audio", exist_ok=True)
         os.makedirs(f"{st.session_state.user_dir}/video", exist_ok=True)
         os.makedirs(f"{st.session_state.user_dir}/saved_videos", exist_ok=True)
