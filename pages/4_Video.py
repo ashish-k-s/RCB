@@ -30,8 +30,11 @@ init_audio_vars()
 init_audio_prompts()
 init_llm_vars()
 
-if 'video_data_dir' not in st.session_state:
+if 'user_dir' in st.session_state:
     st.session_state.video_data_dir = f"{st.session_state.user_dir}/video"
+# if 'video_data_dir' not in st.session_state:
+#     print(f"user dir: {st.session_state.user_dir}")
+#     st.session_state.video_data_dir = f"{st.session_state.user_dir}/video"
 if 'video_file_path' not in st.session_state:
     st.session_state.video_file_path = f"{st.session_state.video_data_dir}/rcb_generated_video.mp4"
 if 'progress_logs' not in st.session_state:
@@ -43,6 +46,7 @@ def clear_old_files():
     """
     if os.path.exists(st.session_state.video_data_dir):
         shutil.rmtree(st.session_state.video_data_dir)
+    print(f"Creating video data directory: {st.session_state.video_data_dir}")
     os.makedirs(st.session_state.video_data_dir, exist_ok=True)
     st.session_state.progress_logs.info("Cleared old files in video data directory.")
     
@@ -163,7 +167,8 @@ def generate_video_from_pptx(uploaded_file):
     slides = convert_from_path("input.pdf", dpi=300)
     for i, slide in enumerate(slides, start=1):
         st.session_state.progress_logs.info(f"Saving slide {i} as image...")
-        slide.save(f"{st.session_state.video_data_dir}/{i}.png", "PNG")
+        str_i = f"{i:03d}"
+        slide.save(f"{st.session_state.video_data_dir}/{str_i}.png", "PNG")
 
     ## Extract speaker notes
     def extract_notes(pptx_file):
@@ -180,18 +185,19 @@ def generate_video_from_pptx(uploaded_file):
 
     for num, note in extract_notes("input.pptx"):
         st.session_state.progress_logs.info(f"Extracting notes from slide {num}...")
-        with open(f"{st.session_state.video_data_dir}/{num}.txt", "w") as f:
+        str_num = f"{num:03d}"
+        with open(f"{st.session_state.video_data_dir}/{str_num}.txt", "w") as f:
             f.write(note)
         st.session_state.curated_transcript = note
-        st.session_state.audio_file_path_txt = f"{st.session_state.video_data_dir}/{num}.txt"
-        st.session_state.audio_file_path_wav = f"{st.session_state.video_data_dir}/{num}.wav"
-        st.session_state.audio_file_path_mp3 = f"{st.session_state.video_data_dir}/{num}.mp3"
+        st.session_state.audio_file_path_txt = f"{st.session_state.video_data_dir}/{str_num}.txt"
+        st.session_state.audio_file_path_wav = f"{st.session_state.video_data_dir}/{str_num}.wav"
+        st.session_state.audio_file_path_mp3 = f"{st.session_state.video_data_dir}/{str_num}.mp3"
         st.session_state.progress_logs.info(f"Creating audio file for slide {num} from transcript")
         print(f"Creating audio file for slide {num} from transcript")
         generate_audio_file_from_transcript()
-        shutil.copyfile(st.session_state.default_audio_file_path_wav, f"{st.session_state.video_data_dir}/{num}.wav")
-        shutil.copyfile(st.session_state.default_audio_file_path_mp3, f"{st.session_state.video_data_dir}/{num}.mp3")
-        shutil.copyfile(st.session_state.default_audio_file_path_txt, f"{st.session_state.video_data_dir}/{num}.txt")
+        shutil.copyfile(st.session_state.default_audio_file_path_wav, st.session_state.audio_file_path_wav)
+        shutil.copyfile(st.session_state.default_audio_file_path_mp3, st.session_state.audio_file_path_mp3)
+        shutil.copyfile(st.session_state.default_audio_file_path_txt, st.session_state.audio_file_path_txt)
 
     st.session_state.progress_logs.info("Slides and notes extracted successfully!")
     simple_video_creator()
