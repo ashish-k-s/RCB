@@ -136,24 +136,24 @@ def ts_to_seconds(ts):
     else:                    # SS
         return parts[0]
 
-def seconds_to_ts(seconds):
-    seconds = float(seconds)
+# def seconds_to_ts(seconds):
+#     seconds = float(seconds)
 
-    h = int(seconds // 3600)
-    seconds %= 3600
-    m = int(seconds // 60)
-    s = seconds % 60
+#     h = int(seconds // 3600)
+#     seconds %= 3600
+#     m = int(seconds // 60)
+#     s = seconds % 60
 
-    # Format seconds: remove trailing .0 if it's an integer
-    if s.is_integer():
-        s = int(s)
+#     # Format seconds: remove trailing .0 if it's an integer
+#     if s.is_integer():
+#         s = int(s)
 
-    if h > 0:
-        return f"{h}:{m:02d}:{s:02d}" if isinstance(s, int) else f"{h}:{m:02d}:{s:05.2f}"
-    elif m > 0:
-        return f"{m}:{s:02d}" if isinstance(s, int) else f"{m}:{s:05.2f}"
-    else:
-        return str(s)
+#     if h > 0:
+#         return f"{h}:{m:02d}:{s:02d}" if isinstance(s, int) else f"{h}:{m:02d}:{s:05.2f}"
+#     elif m > 0:
+#         return f"{m}:{s:02d}" if isinstance(s, int) else f"{m}:{s:05.2f}"
+#     else:
+#         return str(s)
 
 def get_video_duration(video_path):
     cmd = [
@@ -201,15 +201,15 @@ def remove_multiple_sections(video_path, cut_segments):
     print("keep_segments:", keep_segments)
     video_file_count = 1
     for line in keep_segments:
-        print(f"Cut segment: {line}")
+        print(f"Keep segment: {line}")
         start, end = line
         print(f"Start: {start}, End: {end}")
-        start_ts = seconds_to_ts(start)
-        end_ts = seconds_to_ts(end)
+        # start_ts = seconds_to_ts(start)
+        # end_ts = seconds_to_ts(end)
         if end == "":
-            command = f"ffmpeg -i {video_path} -ss {start_ts} -c:v libx264 -c:a aac {st.session_state.user_temp_dir}/{video_file_count}.mp4"
+            command = f"ffmpeg -i {video_path} -ss {start} -c:v libx264 -c:a aac {st.session_state.user_temp_dir}/{video_file_count}.mp4 > /dev/null 2>&1"
         else:
-            command = f"ffmpeg -i {video_path} -ss {start_ts} -to {end_ts} -c:v libx264 -c:a aac {st.session_state.user_temp_dir}/{video_file_count}.mp4"
+            command = f"ffmpeg -i {video_path} -ss {start} -to {end} -c:v libx264 -c:a aac {st.session_state.user_temp_dir}/{video_file_count}.mp4 > /dev/null 2>&1"
         print(f"Command: {command}")
         video_file_count += 1
         os.system(command)
