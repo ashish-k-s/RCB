@@ -1,5 +1,6 @@
 from glob import glob
 import shutil
+from click import command
 import streamlit as st
 import streamlit.components.v1 as components
 from st_bridge import bridge
@@ -38,6 +39,10 @@ if 'dub_selected' not in st.session_state:
     st.session_state.dub_selected = False
 if 'speed_selected' in st.session_state:
     st.session_state.speed_disabled = False
+if 'generate_video_file_name' not in st.session_state:
+    st.session_state.generate_video_file_name = ""
+if 'generate_video_file_path' not in st.session_state:
+    st.session_state.generate_video_file_path = ""
 
 def set_action(selected_option):
     st.session_state.action_str = selected_option
@@ -169,9 +174,8 @@ def build_keep_segments(cut_segments, total_duration):
     keep = []
     current = 0
 
-    for start_ts, end_ts in cut_segments:
-        start = ts_to_seconds(start_ts)
-        end = ts_to_seconds(end_ts)
+    for line in cut_segments:
+        start, end = line[:2]
         if current < start:
             keep.append((current, start))
         current = end
@@ -191,12 +195,13 @@ def remove_multiple_sections(video_path, cut_segments):
                       start_time and end_time can be in seconds or 'hh:mm:ss' format.
     command:
         TRIM PART OF FILE
-        ffmpeg -ss 00:00:00 -i input.mp4 -to 01:42:40 -c copy output1.mp4
+        ffmpeg -y -ss 00:00:00 -i input.mp4 -to 01:42:40 -c copy output1.mp4
         TRIM LAST PART OF FILE
-        ffmpeg -ss 02:43:07 -i input.mp4 -c copy output3.mp4
+        ffmpeg -y -ss 02:43:07 -i input.mp4 -c copy output3.mp4
     """
     total_duration = get_video_duration(video_path)
     print("cut_segments:", cut_segments)
+    cut_segments = [(to_seconds(start), to_seconds(end)) for start, end in cut_segments]
     keep_segments = build_keep_segments(cut_segments, total_duration)
     print("keep_segments:", keep_segments)
     video_file_count = 1
@@ -207,9 +212,9 @@ def remove_multiple_sections(video_path, cut_segments):
         # start_ts = seconds_to_ts(start)
         # end_ts = seconds_to_ts(end)
         if end == "":
-            command = f"ffmpeg -i {video_path} -ss {start} -c:v libx264 -c:a aac {st.session_state.user_temp_dir}/{video_file_count}.mp4 > /dev/null 2>&1"
+            command = f"ffmpeg -y -i {video_path} -ss {start} -c:v libx264 -c:a aac {st.session_state.user_temp_dir}/{video_file_count}.mp4 > /dev/null 2>&1"
         else:
-            command = f"ffmpeg -i {video_path} -ss {start} -to {end} -c:v libx264 -c:a aac {st.session_state.user_temp_dir}/{video_file_count}.mp4 > /dev/null 2>&1"
+            command = f"ffmpeg -y -i {video_path} -ss {start} -to {end} -c:v libx264 -c:a aac {st.session_state.user_temp_dir}/{video_file_count}.mp4 > /dev/null 2>&1"
         print(f"Command: {command}")
         video_file_count += 1
         os.system(command)
@@ -270,67 +275,6 @@ dubbings = [
     ("00:01:05", "wibm-pm.wav"),
     (5, "w-pm.wav"),   # You can also pass seconds directly
 ]
-
-def apply_speed_segments(video_path, speed_instructions, output_path):
-    """
-    Apply speed changes to multiple parts of a video.
-    
-    speed_instructions: list of strings
-        Format: "start end speed"
-        Example: "0:00:05 0:00:11 2"
-    """
-    
-    def to_seconds(t):
-        """Convert hh:mm:ss → seconds (also supports mm:ss or seconds)."""
-        if isinstance(t, (int, float)):
-            return t
-        parts = t.split(":")
-        parts = [float(p) for p in parts]
-        if len(parts) == 3:
-            h, m, s = parts
-            return h*3600 + m*60 + s
-        elif len(parts) == 2:
-            m, s = parts
-            return m*60 + s
-        else:
-            return float(parts[0])
-
-    clip = VideoFileClip(video_path)
-    timeline = []
-
-    # Sort instructions by start time
-    parsed = []
-    for line in speed_instructions:
-        start, end, speed = line.split()
-        parsed.append((ts_to_seconds(start), ts_to_seconds(end), float(speed)))
-    parsed.sort(key=lambda x: x[0])
-
-    last_end = 0
-
-    # Build segments in order
-    for start, end, speed in parsed:
-        # normal segment before speed-up
-        if start > last_end:
-            timeline.append(clip.subclipped(last_end, start))
-
-        # speed-modified segment
-        sped = clip.subclipped(start, end).with_effects([
-            vfx.MultiplySpeed(factor=speed)
-        ])
-        timeline.append(sped)
-
-        last_end = end
-
-    # Remaining tail of video
-    if last_end < clip.duration:
-        timeline.append(clip.subclipped(last_end, clip.duration))
-
-    # Concatenate all parts
-    final = concatenate_videoclips(timeline)
-    final.write_videofile(output_path, codec="libx264", audio_codec="aac")
-
-    clip.close()
-    final.close()
 
 def freeze_video_segments(video_path, freeze_instructions, output_path):
     """
@@ -412,12 +356,55 @@ def process_speed_actions():
     for line in st.session_state.action_text.strip().splitlines():
         start, end, speed = line.split()
         speed_instructions.append(f"{start} {end} {speed}")
+    print("speed_instructions before conversion:", speed_instructions)
+    # Convert timestamps to seconds
+    speed_instructions = [
+        (ts_to_seconds(start), ts_to_seconds(end), float(speed))
+        for instr in speed_instructions
+        for start, end, speed in [instr.split()]
+    ]
+    print("speed_instructions after conversion:", speed_instructions)
+    total_duration = get_video_duration(st.session_state.selected_file_path)
+    print("total_duration:", total_duration)
+    keep_segments = build_keep_segments(speed_instructions, total_duration)
+    print("keep_segments:", keep_segments)
+    all_segments = keep_segments + speed_instructions
+    all_segments.sort()
+    print("all_segments:", all_segments)
 
-    apply_speed_segments(
-        st.session_state.selected_file_path,
-        speed_instructions,
-        generate_video_file_path
-    )
+    video_file_count = 1
+    for segment in all_segments:
+        print("Processing segment:", segment)
+        if len(segment) == 2:
+            start, end = segment
+        if len(segment) == 3:
+            start, end, speed = segment
+        print("Trimming between timestamps: ", segment[:2])
+        command = f"ffmpeg -y -i {st.session_state.selected_file_path} -ss {start} -to {end} -c:v libx264 -c:a aac {st.session_state.user_temp_dir}/{video_file_count}.mp4 > /dev/null 2>&1"
+        print("Executing command:", command)
+        os.system(command)
+        if len(segment) == 3:
+            print("Speeding with factor: ", speed)
+            shutil.move(f"{st.session_state.user_temp_dir}/{video_file_count}.mp4", f"{st.session_state.user_temp_dir}/temp_{video_file_count}.mp4")
+            # Apply speed change using ffmpeg
+            command = f"ffmpeg -y -i {st.session_state.user_temp_dir}/temp_{video_file_count}.mp4 -filter:v \"setpts={1/float(speed):.2f}*PTS\" -an -c:v libx264 {st.session_state.user_temp_dir}/{video_file_count}.mp4 > /dev/null 2>&1"
+            print("Executing command:", command)
+            os.system(command)
+            os.remove(f"{st.session_state.user_temp_dir}/temp_{video_file_count}.mp4")
+        with open(f"{st.session_state.user_temp_dir}/list.txt", "a") as video_list:
+            video_list.write(f"file '{st.session_state.user_temp_dir}/{video_file_count}.mp4'\n")
+        video_list.close()
+        video_file_count += 1
+    command = f"ffmpeg -y -f concat -safe 0 -i {st.session_state.user_temp_dir}/list.txt -c:v libx264 -preset fast -crf 18 -c:a aac -movflags +faststart {st.session_state.generate_video_file_path}"
+    print("Executing command to concatenate:", command)
+    os.system(command)
+
+    mp4_files_to_delete = glob("*.mp4", root_dir=st.session_state.user_temp_dir)
+    print("Deleting temporary files:", mp4_files_to_delete)
+    for file in mp4_files_to_delete:
+        print("Deleting", f"{st.session_state.user_temp_dir}/{file}")
+        os.remove(f"{st.session_state.user_temp_dir}/{file}")
+    os.remove(f"{st.session_state.user_temp_dir}/list.txt")
 
 def process_freeze_actions():
     freeze_instructions = []
@@ -428,7 +415,7 @@ def process_freeze_actions():
     freeze_video_segments(
         st.session_state.selected_file_path,
         freeze_instructions,
-        generate_video_file_path
+        st.session_state.generate_video_file_path
     )
 
 def process_join_actions(directory, video_files_to_join):
@@ -436,28 +423,29 @@ def process_join_actions(directory, video_files_to_join):
     if len(video_files_to_join) == 1:
         print("Only one video file found, moving...")
         video_file = f"{directory}/{video_files_to_join[0]}"
-        print("Moving", video_file, "to", generate_video_file_path)
-        shutil.copy2(video_file, generate_video_file_path)
+        print("Moving", video_file, "to", st.session_state.generate_video_file_path)
+        shutil.copy2(video_file, st.session_state.generate_video_file_path)
     else:
         clips = []
         for vf in video_files_to_join:
             video_path = os.path.join(directory, vf)
             clips.append(VideoFileClip(video_path))
         final = concatenate_videoclips(clips)
-        final.write_videofile(generate_video_file_path, codec="libx264", audio_codec="aac")
+        final.write_videofile(st.session_state.generate_video_file_path, codec="libx264", audio_codec="aac")
         final.close()
     mp4_files_to_delete = glob("*.mp4", root_dir=directory)
     print("Deleting temporary files:", mp4_files_to_delete)
     for file in mp4_files_to_delete:
         print("Deleting", f"{directory}/{file}")
         os.remove(f"{directory}/{file}")
-
+    os.remove(f"{directory}/list.txt")
+    
 def process_dub_actions():
     dubbings = []
     for line in st.session_state.action_text.strip().splitlines():
         time_part, file_part = line.split(maxsplit=1)
         dubbings.append((time_part, file_part))
-    dub_multiple_audios(st.session_state.selected_file_path, dubbings, generate_video_file_path)
+    dub_multiple_audios(st.session_state.selected_file_path, dubbings, st.session_state.generate_video_file_path)
 
 def seconds_to_hhmmss_timedelta(seconds):
     """Converts seconds to hh:mm:ss format using timedelta, discarding fractions."""
@@ -578,15 +566,15 @@ if video_files:
     col1, col2 = st.columns(2)
 
     with col1:    
-        generate_video_file_name = st.text_input("Video File Name")
+        st.session_state.generate_video_file_name = st.text_input("Video File Name")
     
     with col2:
         empty = st.empty()
-        generate_video = st.button("Generate Video",disabled=not generate_video_file_name)
+        generate_video = st.button("Generate Video",disabled=not st.session_state.generate_video_file_name)
     
-    if generate_video and generate_video_file_name:
-        print(f"Generating video file: {generate_video_file_name}.mp4")
-        generate_video_file_path = os.path.join(f"{st.session_state.user_dir}/saved_videos", generate_video_file_name + ".mp4")
+    if generate_video and st.session_state.generate_video_file_name:
+        print(f"Generating video file: {st.session_state.generate_video_file_name}.mp4")
+        st.session_state.generate_video_file_path = os.path.join(f"{st.session_state.user_dir}/saved_videos", st.session_state.generate_video_file_name + ".mp4")
 
         if st.session_state.action_text:
             if st.session_state.action_str == "Trim":
@@ -602,7 +590,7 @@ if video_files:
                 directory = f"{st.session_state.user_dir}/saved_videos"
                 process_join_actions(directory, video_files_to_join)
 
-        st.success(f"Video generated and saved as {generate_video_file_name}.mp4")
+        st.success(f"Video generated and saved as {st.session_state.generate_video_file_name}.mp4")
 else:
     st.sidebar.info("No demo video found. Please upload a .mp4 video file.")
 
