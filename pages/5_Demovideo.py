@@ -1,5 +1,7 @@
 from glob import glob
 import shutil
+import json
+from altair import Dict
 from click import command
 import streamlit as st
 import streamlit.components.v1 as components
@@ -160,14 +162,23 @@ def ts_to_seconds(ts):
 #     else:
 #         return str(s)
 
-def get_video_duration(video_path):
+def get_duration(path: str) -> float:
+    """Return duration in seconds using ffprobe.
+    ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 /media/file/path 
+    """
+    
     cmd = [
-        "ffprobe", "-v", "error",
+        "ffprobe",
+        "-v", "error",
         "-show_entries", "format=duration",
         "-of", "default=noprint_wrappers=1:nokey=1",
-        video_path
+        path,
     ]
-    result = subprocess.run(cmd, stdout=subprocess.PIPE, text=True)
+    print("FFprobe command:", " ".join(cmd))
+    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    print("FFprobe output:", result.stdout.strip())
+    # data = json.loads(result.stdout)
+    # return float(data["format"]["duration"])
     return float(result.stdout.strip())
 
 def build_keep_segments(cut_segments, total_duration):
@@ -199,9 +210,9 @@ def remove_multiple_sections(video_path, cut_segments):
         TRIM LAST PART OF FILE
         ffmpeg -y -ss 02:43:07 -i input.mp4 -c copy output3.mp4
     """
-    total_duration = get_video_duration(video_path)
+    total_duration = get_duration(video_path)
     print("cut_segments:", cut_segments)
-    cut_segments = [(to_seconds(start), to_seconds(end)) for start, end in cut_segments]
+    cut_segments = [(ts_to_seconds(start), ts_to_seconds(end)) for start, end in cut_segments]
     keep_segments = build_keep_segments(cut_segments, total_duration)
     print("keep_segments:", keep_segments)
     video_file_count = 1
@@ -220,56 +231,78 @@ def remove_multiple_sections(video_path, cut_segments):
         os.system(command)
 
 
-def dub_multiple_audios(video_path, dubbings, output_path):
+def dub_audio_on_video(
+    video_path: str,
+    audio_tracks: list[Dict],
+    output_path: str):
     """
-    Dub multiple audio clips into a video at given timestamps.
-
-    Args:
-        video_path (str): Path to input video.
-        dubbings (list): List of tuples [(audio_file, start_time), ...].
-                         start_time can be in seconds or 'hh:mm:ss' format.
-        output_path (str): Path to save final video.
+    audio_tracks example:
+    [
+        {"path": "voice1.wav", "start": 2.5},
+        {"path": "voice2.wav", "start": 8.0},
+    ]
     """
-    # Load video
-    video = VideoFileClip(video_path)
-    base_audio = video.audio
 
-    # Collect all audio layers
-    audio_layers = []
-    if base_audio is not None:
-        audio_layers.append(base_audio)
+    if not audio_tracks:
+        raise ValueError("At least one audio track is required")
 
-    # # Helper to convert hh:mm:ss to seconds
-    # def to_seconds(t):
-    #     if isinstance(t, (int, float)):
-    #         return t
-    #     h, m, s = map(float, t.split(':'))
-    #     return h * 3600 + m * 60 + s
+    # --- durations ---
+    video_duration = get_duration(video_path)
 
-    # Add each new dubbing layer
-    for start_time, audio_file in dubbings:
-        audio_path = st.session_state.user_dir + "/audio/" + audio_file
-        start_sec = ts_to_seconds(start_time)
-        new_audio = AudioFileClip(audio_path).with_start(start_sec)
-        audio_layers.append(new_audio)
+    for track in audio_tracks:
+        if "duration" not in track:
+            track["duration"] = get_duration(track["path"])
 
-    # Combine all audio layers only if there are any
-    if audio_layers:
-        final_audio = CompositeAudioClip(audio_layers)
-    else:
-        final_audio = None
+    last_audio_end = max(
+        t["start"] + t["duration"] for t in audio_tracks
+    )
 
-    # Merge with video and export
-    if final_audio is not None:
-        final = video.with_audio(final_audio)
-    else:
-        final = video
-    final.write_videofile(output_path, codec="libx264", audio_codec="aac")
+    target_duration = max(video_duration, last_audio_end)
 
-    # Cleanup
-    video.close()
-    final.close()
+    # --- ffmpeg command ---
+    cmd = ["ffmpeg", "-y", "-i", video_path]
 
+    for track in audio_tracks:
+        cmd.extend(["-i", track["path"]])
+
+    filter_parts = []
+    mix_inputs = []
+
+    for i, track in enumerate(audio_tracks):
+        delay_ms = int(track["start"] * 1000)
+        label = f"a{i}"
+
+        filters = [f"adelay={delay_ms}|{delay_ms}"]
+
+        filter_parts.append(
+            f"[{i+1}:a]{','.join(filters)}[{label}]"
+        )
+        mix_inputs.append(f"[{label}]")
+
+    filter_complex = (
+        ";".join(filter_parts)
+        + ";"
+        + "".join(mix_inputs)
+        + f"amix=inputs={len(mix_inputs)}:normalize=0,"
+        + "loudnorm=I=-16:TP=-1.5:LRA=11[a]"
+    )
+
+    cmd.extend([
+        "-filter_complex", filter_complex,
+        "-map", "0:v",
+        "-map", "[a]",
+        "-c:v", "copy",
+        "-c:a", "aac",
+        "-t", f"{target_duration:.3f}",
+        output_path,
+    ])
+
+    print("FFmpeg command to dub audio:\n", " ".join(cmd))
+    print(f"Target duration: {target_duration:.2f}s")
+
+    subprocess.run(cmd, check=True)
+
+    return cmd
 
 def freeze_video_segments(video_path, freeze_instructions, output_path):
     """
@@ -280,20 +313,20 @@ def freeze_video_segments(video_path, freeze_instructions, output_path):
         Example: "0:00:10 2"
     """
 
-    def to_seconds(t):
-        """Convert hh:mm:ss, mm:ss, or ss → seconds."""
-        if isinstance(t, (int, float)):
-            return t
-        parts = t.split(":")
-        parts = [float(p) for p in parts]
-        if len(parts) == 3:
-            h, m, s = parts
-            return h*3600 + m*60 + s
-        elif len(parts) == 2:
-            m, s = parts
-            return m*60 + s
-        else:
-            return float(parts[0])
+    # def to_seconds(t):
+    #     """Convert hh:mm:ss, mm:ss, or ss → seconds."""
+    #     if isinstance(t, (int, float)):
+    #         return t
+    #     parts = t.split(":")
+    #     parts = [float(p) for p in parts]
+    #     if len(parts) == 3:
+    #         h, m, s = parts
+    #         return h*3600 + m*60 + s
+    #     elif len(parts) == 2:
+    #         m, s = parts
+    #         return m*60 + s
+    #     else:
+    #         return float(parts[0])
 
     clip = VideoFileClip(video_path)
     timeline = []
@@ -302,7 +335,7 @@ def freeze_video_segments(video_path, freeze_instructions, output_path):
     parsed = []
     for inst in freeze_instructions:
         ts, dur = inst.split()
-        parsed.append((to_seconds(ts), float(dur)))
+        parsed.append((ts_to_seconds(ts), float(dur)))
     parsed.sort(key=lambda x: x[0])
 
     last_end = 0
@@ -358,7 +391,7 @@ def process_speed_actions():
         for start, end, speed in [instr.split()]
     ]
     print("speed_instructions after conversion:", speed_instructions)
-    total_duration = get_video_duration(st.session_state.selected_file_path)
+    total_duration = get_duration(st.session_state.selected_file_path)
     print("total_duration:", total_duration)
     keep_segments = build_keep_segments(speed_instructions, total_duration)
     print("keep_segments:", keep_segments)
@@ -436,10 +469,23 @@ def process_join_actions(directory, video_files_to_join):
     
 def process_dub_actions():
     dubbings = []
+    audio_tracks = []
     for line in st.session_state.action_text.strip().splitlines():
-        time_part, file_part = line.split(maxsplit=1)
-        dubbings.append((time_part, file_part))
-    dub_multiple_audios(st.session_state.selected_file_path, dubbings, st.session_state.generate_video_file_path)
+        ts_start, path = line.split()
+        start = ts_to_seconds(ts_start)
+        dubbings.append((start, path))
+        audio_tracks.append({
+            "path": f"{st.session_state.audio_data_dir}/{path}",
+            "start": float(start)
+        })
+
+    print("Dubbing instructions:", dubbings)
+    print("Audio tracks:", audio_tracks)
+    dub_audio_on_video(
+        video_path=st.session_state.selected_file_path,
+        audio_tracks=audio_tracks,
+        output_path=st.session_state.generate_video_file_path
+    )
 
 def seconds_to_hhmmss_timedelta(seconds):
     """Converts seconds to hh:mm:ss format using timedelta, discarding fractions."""
