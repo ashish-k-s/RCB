@@ -239,17 +239,17 @@ def dub_multiple_audios(video_path, dubbings, output_path):
     if base_audio is not None:
         audio_layers.append(base_audio)
 
-    # Helper to convert hh:mm:ss to seconds
-    def to_seconds(t):
-        if isinstance(t, (int, float)):
-            return t
-        h, m, s = map(float, t.split(':'))
-        return h * 3600 + m * 60 + s
+    # # Helper to convert hh:mm:ss to seconds
+    # def to_seconds(t):
+    #     if isinstance(t, (int, float)):
+    #         return t
+    #     h, m, s = map(float, t.split(':'))
+    #     return h * 3600 + m * 60 + s
 
     # Add each new dubbing layer
     for start_time, audio_file in dubbings:
         audio_path = st.session_state.user_dir + "/audio/" + audio_file
-        start_sec = to_seconds(start_time)
+        start_sec = ts_to_seconds(start_time)
         new_audio = AudioFileClip(audio_path).with_start(start_sec)
         audio_layers.append(new_audio)
 
@@ -270,11 +270,6 @@ def dub_multiple_audios(video_path, dubbings, output_path):
     video.close()
     final.close()
 
-dubbings = [
-    ("00:00:10", "wrh-pm.wav"),
-    ("00:01:05", "wibm-pm.wav"),
-    (5, "w-pm.wav"),   # You can also pass seconds directly
-]
 
 def freeze_video_segments(video_path, freeze_instructions, output_path):
     """
@@ -350,7 +345,6 @@ def process_trim_actions():
     print(mp4_video_files)
     process_join_actions(video_files_dir, mp4_video_files)
 
-
 def process_speed_actions():
     speed_instructions = []
     for line in st.session_state.action_text.strip().splitlines():
@@ -380,14 +374,14 @@ def process_speed_actions():
         if len(segment) == 3:
             start, end, speed = segment
         print("Trimming between timestamps: ", segment[:2])
-        command = f"ffmpeg -y -i {st.session_state.selected_file_path} -ss {start} -to {end} -c:v libx264 -c:a aac {st.session_state.user_temp_dir}/{video_file_count}.mp4 > /dev/null 2>&1"
+        command = f"ffmpeg -y -i {st.session_state.selected_file_path} -ss {start} -to {end} -an -c:v libx264 {st.session_state.user_temp_dir}/{video_file_count}.mp4 > /dev/null 2>&1"
         print("Executing command:", command)
         os.system(command)
         if len(segment) == 3:
             print("Speeding with factor: ", speed)
             shutil.move(f"{st.session_state.user_temp_dir}/{video_file_count}.mp4", f"{st.session_state.user_temp_dir}/temp_{video_file_count}.mp4")
             # Apply speed change using ffmpeg
-            command = f"ffmpeg -y -i {st.session_state.user_temp_dir}/temp_{video_file_count}.mp4 -filter:v \"setpts={1/float(speed):.2f}*PTS\" -an -c:v libx264 {st.session_state.user_temp_dir}/{video_file_count}.mp4 > /dev/null 2>&1"
+            command = f"ffmpeg -y -ss {start} -to {end} -i {st.session_state.user_temp_dir}/temp_{video_file_count}.mp4 -vf \"setpts=PTS/{float(speed):.2f},fps=30,setpts=PTS-STARTPTS\" -an -reset_timestamps 1 -c:v libx264 -preset fast -crf 18 {st.session_state.user_temp_dir}/{video_file_count}.mp4 > /dev/null 2>&1"
             print("Executing command:", command)
             os.system(command)
             os.remove(f"{st.session_state.user_temp_dir}/temp_{video_file_count}.mp4")
