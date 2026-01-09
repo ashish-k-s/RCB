@@ -1,5 +1,6 @@
 from glob import glob
 import shutil
+import pathlib
 import json
 from altair import Dict
 from click import command
@@ -13,6 +14,7 @@ import subprocess
 from pathlib import Path
 
 from rcb_init import init_page
+from rcb_video import init_video_page, cleanup_directory_content, process_video_segments, ts_to_seconds, concat_videos
 from moviepy import VideoFileClip, concatenate_videoclips, AudioFileClip, CompositeAudioClip
 import moviepy.video.fx as vfx
 
@@ -22,33 +24,13 @@ if 'current_page' not in st.session_state:
 st.session_state.current_page = "DemoVideo"
 
 init_page()
-
-if "selected_file" not in st.session_state:
-    st.session_state.selected_file_name = ""
-if "video_path" not in st.session_state:
-    st.session_state.selected_file_path = ""
-if "current_timestamp" not in st.session_state:
-    st.session_state.current_timestamp = ""
-if "action_str" not in st.session_state:
-    st.session_state.action_str = "Trim"
-if "action_text" not in st.session_state:
-    st.session_state.action_text = ""
-if 'selected_index' not in st.session_state:
-    st.session_state.selected_index = 0
-if 'trim_selected' not in st.session_state:
-    st.session_state.trim_selected = False
-if 'dub_selected' not in st.session_state:
-    st.session_state.dub_selected = False
-if 'speed_selected' in st.session_state:
-    st.session_state.speed_disabled = False
-if 'generate_video_file_name' not in st.session_state:
-    st.session_state.generate_video_file_name = ""
-if 'generate_video_file_path' not in st.session_state:
-    st.session_state.generate_video_file_path = ""
+print("Initialized page")
+init_video_page()
 
 def set_action(selected_option):
     st.session_state.action_str = selected_option
     st.session_state.trim_selected = (selected_option == "Trim")
+    st.session_state.keep_selected = (selected_option == "Keep")
     st.session_state.speed_selected = (selected_option == "Speed")
     st.session_state.freeze_selected = (selected_option == "Freeze")
     st.session_state.dub_selected = (selected_option == "Dub")
@@ -102,8 +84,6 @@ def display_common_options():
             st.session_state.current_timestamp = "00:00"
         update_action(st.session_state.current_timestamp + " ")
 
-def display_trim_options():
-    pass
 def display_speed_options():
     speed = st.number_input("Speed Factor:", min_value=0.1, max_value=10.0, value=1.5, step=0.5)
     if st.button("Use this speed"):
@@ -129,38 +109,6 @@ def display_join_options():
     video_file_path = os.path.join(f"{st.session_state.user_dir}/saved_videos", video_file_join)
     if st.button("Add this video to join list"):
         update_action( video_file_join + "\n" )
-
-def ts_to_seconds(ts):
-    parts = ts.split(":")
-    parts = [float(p) for p in parts]
-
-    if len(parts) == 3:      # HH:MM:SS
-        h, m, s = parts
-        return h * 3600 + m * 60 + s
-    elif len(parts) == 2:    # MM:SS
-        m, s = parts
-        return m * 60 + s
-    else:                    # SS
-        return parts[0]
-
-# def seconds_to_ts(seconds):
-#     seconds = float(seconds)
-
-#     h = int(seconds // 3600)
-#     seconds %= 3600
-#     m = int(seconds // 60)
-#     s = seconds % 60
-
-#     # Format seconds: remove trailing .0 if it's an integer
-#     if s.is_integer():
-#         s = int(s)
-
-#     if h > 0:
-#         return f"{h}:{m:02d}:{s:02d}" if isinstance(s, int) else f"{h}:{m:02d}:{s:05.2f}"
-#     elif m > 0:
-#         return f"{m}:{s:02d}" if isinstance(s, int) else f"{m}:{s:05.2f}"
-#     else:
-#         return str(s)
 
 def get_duration(path: str) -> float:
     """Return duration in seconds using ffprobe.
@@ -195,41 +143,6 @@ def build_keep_segments(cut_segments, total_duration):
         keep.append((current, total_duration))
 
     return keep
-
-def remove_multiple_sections(video_path, cut_segments):
-    """
-    Remove multiple sections from a video.
-
-    Args:
-        video_path (str): Path to input video.
-        cut_segments (list): List of tuples [(start_time, end_time), ...].
-                      start_time and end_time can be in seconds or 'hh:mm:ss' format.
-    command:
-        TRIM PART OF FILE
-        ffmpeg -y -ss 00:00:00 -i input.mp4 -to 01:42:40 -c copy output1.mp4
-        TRIM LAST PART OF FILE
-        ffmpeg -y -ss 02:43:07 -i input.mp4 -c copy output3.mp4
-    """
-    total_duration = get_duration(video_path)
-    print("cut_segments:", cut_segments)
-    cut_segments = [(ts_to_seconds(start), ts_to_seconds(end)) for start, end in cut_segments]
-    keep_segments = build_keep_segments(cut_segments, total_duration)
-    print("keep_segments:", keep_segments)
-    video_file_count = 1
-    for line in keep_segments:
-        print(f"Keep segment: {line}")
-        start, end = line
-        print(f"Start: {start}, End: {end}")
-        # start_ts = seconds_to_ts(start)
-        # end_ts = seconds_to_ts(end)
-        if end == "":
-            command = f"ffmpeg -y -i {video_path} -ss {start} -c:v libx264 -c:a aac {st.session_state.user_temp_dir}/{video_file_count}.mp4 > /dev/null 2>&1"
-        else:
-            command = f"ffmpeg -y -i {video_path} -ss {start} -to {end} -c:v libx264 -c:a aac {st.session_state.user_temp_dir}/{video_file_count}.mp4 > /dev/null 2>&1"
-        print(f"Command: {command}")
-        video_file_count += 1
-        os.system(command)
-
 
 def dub_audio_on_video(
     video_path: str,
@@ -312,22 +225,6 @@ def freeze_video_segments(video_path, freeze_instructions, output_path):
         Format: "timestamp freeze_duration"
         Example: "0:00:10 2"
     """
-
-    # def to_seconds(t):
-    #     """Convert hh:mm:ss, mm:ss, or ss → seconds."""
-    #     if isinstance(t, (int, float)):
-    #         return t
-    #     parts = t.split(":")
-    #     parts = [float(p) for p in parts]
-    #     if len(parts) == 3:
-    #         h, m, s = parts
-    #         return h*3600 + m*60 + s
-    #     elif len(parts) == 2:
-    #         m, s = parts
-    #         return m*60 + s
-    #     else:
-    #         return float(parts[0])
-
     clip = VideoFileClip(video_path)
     timeline = []
 
@@ -364,74 +261,41 @@ def freeze_video_segments(video_path, freeze_instructions, output_path):
     clip.close()
     final.close()
 
+def process_keep_actions():
+    timestamps_to_keep = [tuple(line.split()) for line in st.session_state.action_text.splitlines() if line.strip()]
+    print("timestamps_to_keep before", timestamps_to_keep)
+    seconds_to_keep = [
+        (ts_to_seconds(start), ts_to_seconds(end))
+        for start, end in timestamps_to_keep
+    ]
+    print("timestamps_to_keep after", seconds_to_keep)
+    print(timestamps_to_keep)
+    process_video_segments(seconds_to_keep, st.session_state.action_str)
+    st.success("Keep action processed successfully!")
+
 def process_trim_actions():
     timestamps_to_trim = [tuple(line.split()) for line in st.session_state.action_text.splitlines() if line.strip()]
-
+    print("timestamps_to_trim before", timestamps_to_trim)
+    seconds_to_trim = [
+        (ts_to_seconds(start), ts_to_seconds(end))
+        for start, end in timestamps_to_trim
+    ]
+    print("timestamps_to_trim after", seconds_to_trim)
     print(timestamps_to_trim)
-
-    remove_multiple_sections(st.session_state.selected_file_path, timestamps_to_trim)
-
-    video_files_dir = Path(st.session_state.user_temp_dir)
-
-    mp4_video_files = sorted([f.name for f in video_files_dir.glob("*.mp4")])
-
-    print(mp4_video_files)
-    process_join_actions(video_files_dir, mp4_video_files)
+    process_video_segments(seconds_to_trim, st.session_state.action_str)
+    st.success("Trim action processed successfully!")
 
 def process_speed_actions():
-    speed_instructions = []
-    for line in st.session_state.action_text.strip().splitlines():
-        start, end, speed = line.split()
-        speed_instructions.append(f"{start} {end} {speed}")
-    print("speed_instructions before conversion:", speed_instructions)
-    # Convert timestamps to seconds
-    speed_instructions = [
+    timestamps_to_speed = [tuple(line.split()) for line in st.session_state.action_text.splitlines() if line.strip()]
+    print("timestamps_to_speed before", timestamps_to_speed)
+    seconds_to_speed = [
         (ts_to_seconds(start), ts_to_seconds(end), float(speed))
-        for instr in speed_instructions
-        for start, end, speed in [instr.split()]
+        for start, end, speed in timestamps_to_speed
     ]
-    print("speed_instructions after conversion:", speed_instructions)
-    total_duration = get_duration(st.session_state.selected_file_path)
-    print("total_duration:", total_duration)
-    keep_segments = build_keep_segments(speed_instructions, total_duration)
-    print("keep_segments:", keep_segments)
-    all_segments = keep_segments + speed_instructions
-    all_segments.sort()
-    print("all_segments:", all_segments)
-
-    video_file_count = 1
-    for segment in all_segments:
-        print("Processing segment:", segment)
-        if len(segment) == 2:
-            start, end = segment
-        if len(segment) == 3:
-            start, end, speed = segment
-        print("Trimming between timestamps: ", segment[:2])
-        command = f"ffmpeg -y -i {st.session_state.selected_file_path} -ss {start} -to {end} -an -c:v libx264 {st.session_state.user_temp_dir}/{video_file_count}.mp4 > /dev/null 2>&1"
-        print("Executing command:", command)
-        os.system(command)
-        if len(segment) == 3:
-            print("Speeding with factor: ", speed)
-            shutil.move(f"{st.session_state.user_temp_dir}/{video_file_count}.mp4", f"{st.session_state.user_temp_dir}/temp_{video_file_count}.mp4")
-            # Apply speed change using ffmpeg
-            command = f"ffmpeg -y -ss {start} -to {end} -i {st.session_state.user_temp_dir}/temp_{video_file_count}.mp4 -vf \"setpts=PTS/{float(speed):.2f},fps=30,setpts=PTS-STARTPTS\" -an -reset_timestamps 1 -c:v libx264 -preset fast -crf 18 {st.session_state.user_temp_dir}/{video_file_count}.mp4 > /dev/null 2>&1"
-            print("Executing command:", command)
-            os.system(command)
-            os.remove(f"{st.session_state.user_temp_dir}/temp_{video_file_count}.mp4")
-        with open(f"{st.session_state.user_temp_dir}/list.txt", "a") as video_list:
-            video_list.write(f"file '{st.session_state.user_temp_dir}/{video_file_count}.mp4'\n")
-        video_list.close()
-        video_file_count += 1
-    command = f"ffmpeg -y -f concat -safe 0 -i {st.session_state.user_temp_dir}/list.txt -c:v libx264 -preset fast -crf 18 -c:a aac -movflags +faststart {st.session_state.generate_video_file_path}"
-    print("Executing command to concatenate:", command)
-    os.system(command)
-
-    mp4_files_to_delete = glob("*.mp4", root_dir=st.session_state.user_temp_dir)
-    print("Deleting temporary files:", mp4_files_to_delete)
-    for file in mp4_files_to_delete:
-        print("Deleting", f"{st.session_state.user_temp_dir}/{file}")
-        os.remove(f"{st.session_state.user_temp_dir}/{file}")
-    os.remove(f"{st.session_state.user_temp_dir}/list.txt")
+    print("timestamps_to_speed after", seconds_to_speed)
+    print(timestamps_to_speed)
+    process_video_segments(seconds_to_speed, st.session_state.action_str)
+    st.success("Speed action processed successfully!")
 
 def process_freeze_actions():
     freeze_instructions = []
@@ -445,27 +309,20 @@ def process_freeze_actions():
         st.session_state.generate_video_file_path
     )
 
-def process_join_actions(directory, video_files_to_join):
+def process_join_actions():
+    video_files_to_join = [line.strip() for line in st.session_state.action_text.strip().splitlines() if line.strip()]
     print("Videos to join:", video_files_to_join)
-    if len(video_files_to_join) == 1:
-        print("Only one video file found, moving...")
-        video_file = f"{directory}/{video_files_to_join[0]}"
-        print("Moving", video_file, "to", st.session_state.generate_video_file_path)
-        shutil.copy2(video_file, st.session_state.generate_video_file_path)
-    else:
-        clips = []
-        for vf in video_files_to_join:
-            video_path = os.path.join(directory, vf)
-            clips.append(VideoFileClip(video_path))
-        final = concatenate_videoclips(clips)
-        final.write_videofile(st.session_state.generate_video_file_path, codec="libx264", audio_codec="aac")
-        final.close()
-    mp4_files_to_delete = glob("*.mp4", root_dir=directory)
-    print("Deleting temporary files:", mp4_files_to_delete)
-    for file in mp4_files_to_delete:
-        print("Deleting", f"{directory}/{file}")
-        os.remove(f"{directory}/{file}")
-    os.remove(f"{directory}/list.txt")
+    cleanup_directory_content(st.session_state.user_temp_dir)
+    directory = f"{st.session_state.user_dir}/saved_videos"
+    for i, video_file in enumerate(video_files_to_join, start=1):
+        i_str = f"{i:03d}"
+        print(f"copying {video_file} as {i_str}.mp4")
+        video_file_path = pathlib.Path(f"{st.session_state.user_dir}/saved_videos/{video_file}")
+        shutil.copy2(video_file_path, f"{st.session_state.user_temp_dir}/{i_str}.mp4")
+        with open(f"{st.session_state.user_temp_dir}/list.txt", "a") as f:
+            f.write(f"file '{i_str}.mp4'\n")
+        i += 1
+    concat_videos(st.session_state.user_temp_dir)
     
 def process_dub_actions():
     dubbings = []
@@ -567,18 +424,20 @@ if video_files:
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        options = ["Trim", "Speed", "Freeze", "Dub", "Join"]
+        options = ["Trim", "Keep", "Speed", "Freeze", "Dub", "Join"]
         action = st.selectbox("Action Type:", options, index=st.session_state.selected_index, disabled=st.session_state.get("disable_all"), on_change=clear_actions)
+        if action == "Trim" or action == "Keep" or action == "Speed" or action == "Join":
+            st.session_state.preserve_audio = st.checkbox("Preserve Audio", value=st.session_state.get("preserve_audio", True))
         set_action(action)
     with col2:
-        if st.session_state.trim_selected or st.session_state.speed_selected or st.session_state.freeze_selected or st.session_state.dub_selected:
+        if st.session_state.trim_selected or st.session_state.keep_selected or st.session_state.speed_selected or st.session_state.freeze_selected or st.session_state.dub_selected:
             display_common_options()
         if st.session_state.join_selected:
             display_join_options()
 
     with col3:
-        if st.session_state.trim_selected:
-            display_trim_options()
+        if st.session_state.trim_selected or st.session_state.keep_selected:
+            pass
         elif st.session_state.speed_selected:
             display_speed_options()
         elif st.session_state.freeze_selected:
@@ -587,11 +446,13 @@ if video_files:
             display_dub_options()
 
     if st.session_state.trim_selected:
-        actions_format_text = "Trim Action Format:    start_time    end_time    (one per line)\nExample:\n00:00:10    00:00:20\n00:01:00    00:01:15"
+        actions_format_text = "Trim unwanted sections of the video file.\nTrim Action Format:    start_time    end_time    (one per line)\nExample:\n00:00:10    00:00:20\n00:01:00    00:01:15"
+    if st.session_state.keep_selected:
+        actions_format_text = "Keep required sections of the video file and discard other sections.\nKeep Action Format:    start_time    end_time    (one per line)\nExample:\n00:00:10    00:00:20\n00:01:00    00:01:15"
     elif st.session_state.speed_selected:
-        actions_format_text = "Speed Action Format:    start_time    end_time    speed_factor (one per line)\nExample:\n00:00:10    00:00:20    2.0\n00:01:00    00:01:15    0.5"
+        actions_format_text = "Speed Action Format:    start_time    end_time    speed_factor (one per line)\nExample:\n00:00:10    00:00:20    2.0\n00:01:00    00:01:15    0.5\nNOTE: Do not speed up segments that contain audio."
     elif st.session_state.freeze_selected:
-        actions_format_text = "Freeze Action Format:    timestamp    freeze_duration (one per line)\nExample:\n00:00:10    2.0\n00:01:00    1.5"
+        actions_format_text = "Freeze Action Format:    timestamp    freeze_duration (one per line)\nExample:\n00:00:10    2.0\n00:01:00    1.5\nNOTE: Do not freeze the timestamps that contain audio."
     elif st.session_state.dub_selected:
         actions_format_text = "Dub Action Format:    timestamp    audio_file_name (one per line)\nExample:\n00:00:10    wrh-pm.wav\n00:01:00    audio-file-name.wav"
     elif st.session_state.join_selected:
@@ -619,6 +480,8 @@ if video_files:
         if st.session_state.action_text:
             if st.session_state.action_str == "Trim":
                 process_trim_actions()
+            if st.session_state.action_str == "Keep":
+                process_keep_actions()
             if st.session_state.action_str == "Dub":
                 process_dub_actions()
             if st.session_state.action_str == "Speed":
@@ -626,9 +489,8 @@ if video_files:
             if st.session_state.action_str == "Freeze":
                 process_freeze_actions()
             if st.session_state.action_str == "Join":
-                video_files_to_join = [line.strip() for line in st.session_state.action_text.strip().splitlines() if line.strip()]
-                directory = f"{st.session_state.user_dir}/saved_videos"
-                process_join_actions(directory, video_files_to_join)
+                process_join_actions()
+                # process_join_actions(directory, video_files_to_join)
 
         st.success(f"Video generated and saved as {st.session_state.generate_video_file_name}.mp4")
 else:
