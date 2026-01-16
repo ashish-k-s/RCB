@@ -72,11 +72,11 @@ def get_duration(path: str) -> float:
     return float(result.stdout.strip())
 
 def concat_videos(directory):
-    video_files_to_join = glob.glob("*.mp4", root_dir=st.session_state.user_temp_dir)
+    video_files_to_join = list(Path(st.session_state.user_temp_dir).glob("*.mp4"))
     print("Videos to join:", video_files_to_join)
     if len(video_files_to_join) == 1:
         print("Only one video file found, moving...")
-        video_file = f"{directory}/{video_files_to_join[0]}"
+        video_file = f"{video_files_to_join[0]}"
         print("Moving", video_file, "to", st.session_state.generate_video_file_path)
         shutil.copy2(video_file, st.session_state.generate_video_file_path)
     else:
