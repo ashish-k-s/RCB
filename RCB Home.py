@@ -8,7 +8,7 @@ import tempfile
 import shutil
 import os
 
-from rcb_init import init_page
+from rcb_init import init_page, authenticate
 
 st.set_page_config(
     page_title="Rapid Course Builder (RCB)"
@@ -27,11 +27,22 @@ if 'use_maas' not in st.session_state:
 
 
 user_name = st.text_input("Username", value=st.session_state.username)
+user_password = st.text_input("Password", type="password", value=st.session_state.userpassword)
+
 if st.button("Login"):
-    st.session_state.username = user_name
-    st.session_state.disable_all = False
-    print(f"Logged in as: {st.session_state.username}")
-    st.rerun()
+    # st.session_state.username = user_name
+    # st.session_state.userpassword = user_password
+    if authenticate(user_name, user_password):
+        print("Authentication successful!")
+        st.session_state.disable_all = False
+        st.session_state.username = user_name
+        print(f"Logged in as: {st.session_state.username}")
+        st.rerun()
+    else:
+        print("Authentication failed.")
+        st.session_state.disable_all = True
+        st.session_state.username = ""
+        st.rerun()
 
 with open("RCB Home.md", "r") as f:
     markdown_content = f.read()

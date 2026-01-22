@@ -46,6 +46,31 @@ def display_top_banner():
     banner_markdown_text = banner_markdown_text_1 + banner_markdown_text_2
     st.markdown(banner_markdown_text,unsafe_allow_html=True)
 
+def authenticate(username, password, filename="users.txt"):
+    """
+    Authenticates a user by checking username and password
+    against entries in a text file.
+    """
+    try:
+        with open(filename, "r") as file:
+            for line in file:
+                # Strip whitespace and skip empty lines
+                line = line.strip()
+                if not line:
+                    continue
+
+                stored_username, stored_password = line.split(maxsplit=1)
+
+                if username == stored_username:
+                    if password == stored_password:
+                        return True
+                    else:
+                        return False
+        return False
+
+    except FileNotFoundError:
+        print("Authentication file not found.")
+        return False
 
 def init_page():
     display_top_banner()
@@ -55,6 +80,8 @@ def init_page():
         st.session_state.data_dir = os.getenv("DATA_DIR", "/tmp/rcb_data") 
     if 'user_dir' not in st.session_state:
         st.session_state.user_dir = ""
+    if 'userpassword' not in st.session_state:
+        st.session_state.userpassword = ""
     if 'username' not in st.session_state:
         st.session_state.username = ""
         st.session_state.disable_all = True
