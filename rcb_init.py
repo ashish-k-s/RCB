@@ -249,6 +249,14 @@ def init_audio_vars():
     st.session_state.gemini_tts_voice_female = 'Kore'
     st.session_state.gemini_tts_voice_male = 'Orus'
 
+def init_chat_interface_prompts():
+    st.session_state.system_prompt_chat_interface = f"""
+    You are a helpful assistant.
+    """
+    st.session_state.user_prompt_chat_interface = f"""
+    You are chatting with user. Please answer the user's queries to the best of your ability. user's question is: {st.session_state.user_input}
+    """
+
 def init_quickcourse_prompts():
     st.session_state.system_prompt_course_outline = f"""
     You are a Course Designer expert in understanding the requirements of the curriculum and developing the course outline.
