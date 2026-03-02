@@ -7,7 +7,7 @@ import streamlit as st
 
 from pathlib import Path
 
-def init_video_page():
+def init_edit_video_page():
     if 'preserve_audio' not in st.session_state:
         st.session_state.preserve_audio = True
     if "selected_file" not in st.session_state:

@@ -14,7 +14,7 @@ import subprocess
 from pathlib import Path
 
 from rcb_init import init_page, init_audio_vars
-from rcb_video import init_video_page, cleanup_directory_content, process_video_segments, ts_to_seconds, concat_videos
+from rcb_edit_video import init_edit_video_page, cleanup_directory_content, process_video_segments, ts_to_seconds, concat_videos
 from moviepy import VideoFileClip, concatenate_videoclips, AudioFileClip, CompositeAudioClip
 import moviepy.video.fx as vfx
 
@@ -25,7 +25,7 @@ st.session_state.current_page = "DemoVideo"
 
 init_page()
 print("Initialized page")
-init_video_page()
+init_edit_video_page()
 
 def set_action(selected_option):
     st.session_state.action_str = selected_option
