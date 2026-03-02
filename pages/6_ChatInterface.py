@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 
 from rcb_init import init_page, init_llm_vars, init_chat_interface_prompts
 from rcb_llm_manager import call_llm_to_generate_response
+from rcb_quickcourse import process_uploaded_documents, retrieve_context
 
 def get_ai_response():
     init_chat_interface_prompts()
@@ -28,9 +29,9 @@ def render_chat_interface_ui():
     with col1:
         st.session_state.chat_interface_persona = st.selectbox("Select persona", options=["RCB Chat", "RCB Curator"], disabled=st.session_state.disable_all)
     with col2:
-        st.checkbox("Use Context from RAG database", disabled=st.session_state.disable_all, value=True)
+        st.session_state.use_rag = st.checkbox("Use Context from RAG database", disabled=st.session_state.disable_all, value=True)
     with col3:
-        st.checkbox("Use Conversation History", disabled=st.session_state.disable_all, value=False)
+        st.session_state.use_history = st.checkbox("Use Conversation History", disabled=st.session_state.disable_all, value=False)
         st.button("Reset Conversation", disabled=st.session_state.disable_all, on_click=lambda: st.session_state.chat_history.clear())
 
     st.session_state.chat_container = st.container(height=600, border=True)
@@ -46,19 +47,29 @@ def render_chat_interface_ui():
             'role': 'user',
             'content': st.session_state.user_input
         })
-        st.session_state.chat_container.info("**You:**", width=100, icon="👤")
+        # st.session_state.chat_container.info("**You:**", width=100, icon="👤")
+        st.session_state.chat_container.markdown(":blue-background[👤 You:]")
         st.session_state.chat_container.write(f"{st.session_state.user_input}")
+        
+
+        if st.session_state.use_rag:
+            print("Using RAG context")
+            st.session_state.retrieved_context = retrieve_context(st.session_state.user_input)
+        else:
+            st.session_state.retrieved_context = ""
         get_ai_response()
 
 def update_chat_container():
     with st.session_state.chat_container:
         for message in st.session_state.chat_history:
             if message['role'] == 'user':
-                st.info("**You:**", width=100, icon="👤")
-                st.text(f"{message['content']}")
+                # st.info("**You:**", width=100, icon="👤")
+                st.markdown(":blue-background[👤 You:]")
+                st.write(f"{message['content']}")
             else:
-                st.info("**RCB:**", icon="🤖", width=100)
-                st.markdown(f"```\n{message['content']}\n```")
+                # st.info("**RCB:**", icon="🤖", width=100)
+                st.markdown(":blue-background[🤖 RCB:]")
+                st.write(f"\n{message['content']}\n")
 
         # Auto-scroll to bottom
         if st.session_state.chat_history:
@@ -72,12 +83,16 @@ st.session_state.current_page = 'ChatInterface'
 st.session_state.use_default_prompts = False
 if 'user_input' not in st.session_state:
     st.session_state.user_input = ""
-    
+
+if 'retrieved_context' not in st.session_state:
+    st.session_state.retrieved_context = ""
+
 # Initialize chat history in session state
 if 'chat_history' not in st.session_state:
     st.session_state.chat_history = []
 
 init_page()
+# show_document_upload()
 init_llm_vars()
 init_chat_interface_prompts()
 

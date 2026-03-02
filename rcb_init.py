@@ -81,7 +81,7 @@ def init_page():
         st.session_state.progress_logs = st.empty()
 
     print(f"User: {st.session_state.username}, User Dir: {st.session_state.user_dir}, Data Dir: {st.session_state.data_dir}")
-          
+
 def init_quickcourse_page():
     if 'repo_verified' not in st.session_state:
         st.session_state.repo_verified = False
@@ -250,11 +250,49 @@ def init_audio_vars():
     st.session_state.gemini_tts_voice_male = 'Orus'
 
 def init_chat_interface_prompts():
-    st.session_state.system_prompt_chat_interface = f"""
-    You are a helpful assistant.
+    st.session_state.system_prompt_chat_interface = """
+    You are a helpful, accurate AI assistant. **Your name is RCB**.
+
+    You will be given:
+    - Retrieved context from a knowledge base (RAG)
+    - A user's question
+
+    Rules:
+    1. Use the provided context as your primary source of truth.
+    2. If the answer is fully supported by the context, answer confidently.
+    3. If the context is partially relevant, combine it with general knowledge and clearly indicate assumptions.
+    4. If the context does NOT contain enough information, say you do not have sufficient information rather than hallucinating.
+    5. Do NOT mention the word "RAG" or describe your internal process.
+    6. Keep answers clear, concise, and directly focused on the user's question.
     """
+    if 'use_history' not in st.session_state:
+        st.session_state.use_history = False
+    if 'use_rag' not in st.session_state:
+        st.session_state.use_rag = True
+        
+    if st.session_state.use_history:
+        history_text = "\n".join([f"{msg['role']}: {msg['content']}" for msg in st.session_state.chat_history])
+    else:
+        history_text = ""
+
+    if st.session_state.use_rag:
+        retrieved_context_text = st.session_state.retrieved_context
+    else:
+        retrieved_context_text = ""
+
     st.session_state.user_prompt_chat_interface = f"""
-    You are chatting with user. Please answer the user's queries to the best of your ability. user's question is: {st.session_state.user_input}
+    Context:
+    {retrieved_context_text}
+
+    Conversation History:
+    {history_text}
+
+    User Question:
+    {st.session_state.user_input}
+
+    Instructions:
+    - Answer the question using the context above.
+    - If the context is insufficient, clearly state that.
     """
 
 def init_quickcourse_prompts():
