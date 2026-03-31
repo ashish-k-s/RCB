@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 from rcb_init import init_page, init_llm_vars, init_chat_interface_prompts
 from rcb_llm_manager import call_llm_to_generate_response
-from rcb_quickcourse import process_uploaded_documents, retrieve_context
+from rcb_rag_manager import process_uploaded_documents, retrieve_context
 
 def get_ai_response():
     init_chat_interface_prompts()

@@ -2,10 +2,12 @@ import streamlit as st
 import os
 import time
 
+
+
 from dotenv import load_dotenv
 
 from langchain_openai import ChatOpenAI
-from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+# from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 import google.genai as genai
 
 def add_log(message: str):
@@ -79,7 +81,7 @@ def init_page():
         st.session_state.rag_enabled = False
     if 'progress_logs' not in st.session_state:
         st.session_state.progress_logs = st.empty()
-
+        
     print(f"User: {st.session_state.username}, User Dir: {st.session_state.user_dir}, Data Dir: {st.session_state.data_dir}")
 
 def init_quickcourse_page():

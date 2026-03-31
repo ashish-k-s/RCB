@@ -1,3 +1,4 @@
+from rcb_rag_manager import retrieve_context
 import streamlit as st
 from PIL import Image
 from io import BytesIO
@@ -8,7 +9,8 @@ import google.genai as genai
 import shutil
 
 from langchain_openai import ChatOpenAI
-from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+# from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+from langchain_core.callbacks import StreamingStdOutCallbackHandler
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_community.llms import Ollama
 from langchain_core.output_parsers import StrOutputParser
@@ -302,6 +304,7 @@ def render_image_generation_ui():
         update_d2_image_code()
 
     if generate_image:
+        st.session_state.retrieved_context = retrieve_context(user_prompt_text) if st.session_state.use_rag else ""
         st.session_state.user_prompt = user_prompt_text
         print(f"Generating image code for User Prompt: {st.session_state.user_prompt}")    
         if not st.session_state.user_prompt.strip():
@@ -309,6 +312,10 @@ def render_image_generation_ui():
             st.stop()
 
         st.session_state.user_prompt_generate_image = f"""
+        Refer to the retrieved context below:
+
+        {st.session_state.retrieved_context}
+
         Generate the D2 code for the following diagram description:  
         {st.session_state.user_prompt}
 

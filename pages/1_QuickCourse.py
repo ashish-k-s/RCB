@@ -5,6 +5,8 @@ import glob
 import shutil
 import time
 
+
+
 from rcb_init import init_page, init_llm_vars, init_quickcourse_page, init_quickcourse_vars, init_quickcourse_prompts
 
 st.title("Build QuickCourse using RCB")
@@ -17,14 +19,15 @@ init_llm_vars()
 init_quickcourse_page()
 init_quickcourse_vars()
 
-from rcb_quickcourse import process_uploaded_documents, extract_code_blocks, multiline_to_csv, generate_antora_yml, retrieve_context
+from rcb_quickcourse import extract_code_blocks, multiline_to_csv, generate_antora_yml
+from rcb_rag_manager import retrieve_context
 
 from rcb_github import setup_github_repo, push_to_github, add_github_contributors
 from rcb_llm_manager import call_llm_to_generate_response
 
 
-if 'vectorstore' not in st.session_state:
-    st.session_state.vectorstore = None
+# if 'vectorstore' not in st.session_state:
+#     st.session_state.vectorstore = None
 if 'chat_enabled' not in st.session_state:
     st.session_state.chat_enabled = False
 if 'show_logs' not in st.session_state:
@@ -36,8 +39,8 @@ if 'ai_generated_topics' not in st.session_state:
 if 'show_proceed_button' not in st.session_state:
     st.session_state.show_proceed_button = False
 
-if 'retriever' not in st.session_state:
-    st.session_state.retriever = None
+# if 'retriever' not in st.session_state:
+#     st.session_state.retriever = None
 if 'context_for_outline' not in st.session_state:
     st.session_state.context_for_outline = ""
 if 'topics_for_outline' not in st.session_state:
@@ -48,36 +51,6 @@ if 'course_outline' not in st.session_state:
 if 'context_from_rag' not in st.session_state:
     st.session_state.context_from_rag = ""
     
-@st.dialog("Are you sure you want to clear all uploaded data? This can't be undone.")
-def clear_uploaded_content():
-    if st.button("Yes"):
-        for dir in ["uploads", "chroma"]:
-            dir_to_delete = os.path.join(st.session_state.user_dir, dir)
-            files_to_delete = os.path.join(st.session_state.user_dir, f"uploads-hash.txt")
-            os.remove(files_to_delete) if os.path.exists(files_to_delete) else None
-
-            # Delete hash file if exists
-            if os.path.exists(dir_to_delete):
-                try:
-                    shutil.rmtree(dir_to_delete)
-                    print(f"Successfully deleted directory: {dir_to_delete}")
-                except OSError as e:
-                    print(f"Error deleting directory {dir_to_delete}: {e}")
-            else:
-                print(f"Directory not found: {dir_to_delete}")
-        st.rerun()
-    else:
-        pass
-
-@st.dialog("List of contents added in RAG database")
-def show_file_content_dialog(filepath):
-    try:
-        with open(filepath, "r") as f:
-            content = f.read()
-        #st.subheader(f"Content of: {filepath}")
-        st.code(content, language="text") # Use st.code for raw text content
-    except FileNotFoundError:
-        st.error(f"File not found: {filepath}")
 
 def update_ai_generated_topics():
     """
@@ -96,41 +69,6 @@ def update_ai_generated_topics():
     #st.rerun()
 
 with st.sidebar:
-    st.subheader("Document Upload")
-    uploaded_files = st.file_uploader(
-        "Upload Documents,",
-        type=['pdf','txt'],
-        accept_multiple_files=True,
-        help=f"Upload documents to provide context for the AI. Supported formats: pdf, txt",
-        disabled=st.session_state.disable_all   
-    )
-
-    if uploaded_files:
-        process_files_button = st.button("Process Documents")
-        if process_files_button:
-            print(f"UPLOADED FILES:\n {uploaded_files}")
-            ## Remove duplicate file names
-            unique_files = []
-            seen_names = set()
-            for file in uploaded_files:
-                if file.name not in seen_names:
-                    unique_files.append(file)
-                    seen_names.add(file.name)
-            #uploaded_files = list(set(uploaded_files))
-            print(f"UPLOADED_UNIQUE_FILES: \n {unique_files}")
-            process_uploaded_documents(unique_files)
-            #save_uploaded_documents(unique_files)
-
-    if os.path.exists(f"{st.session_state.user_dir}/uploads"):
-        view_uploads = st.button("View uploads")
-        clear_uploads = st.button("Clear uploads")
-
-        if view_uploads:
-            show_file_content_dialog(f"{st.session_state.user_dir}/uploads-hash.txt")
-
-        if clear_uploads:
-            clear_uploaded_content()
-
     st.subheader("GitHub Repository")
     repo_name = st.text_input(
         "Repository Name",
