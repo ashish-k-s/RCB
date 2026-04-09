@@ -36,7 +36,7 @@ def call_llm_to_generate_response(model_choice: str, system_prompt: str, user_pr
             openai_api_base=MAAS_API_BASE,
             model_name="granite-3-3-8b-instruct",
             temperature=0.05,
-            max_tokens=512,
+            max_tokens=8192,
             streaming=True,
             #callbacks=[StreamingStdOutCallbackHandler()],
             top_p=0.9,

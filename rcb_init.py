@@ -264,7 +264,7 @@ def init_chat_interface_prompts():
     2. If the answer is fully supported by the context, answer confidently.
     3. If the context is partially relevant, combine it with general knowledge and clearly indicate assumptions.
     4. If the context does NOT contain enough information, say you do not have sufficient information rather than hallucinating.
-    5. Do NOT mention the word "RAG" or describe your internal process.
+    5. In your response, do NOT mention the word "RAG" or describe your internal process or disclose your identity as RCB. Focus on providing a clear and direct answer to the user's question based on the context.
     6. Keep answers clear, concise, and directly focused on the user's question.
     """
     if 'use_history' not in st.session_state:
