@@ -16,3 +16,9 @@ pdf2image
 moviepy
 streamlit-bridge
 google.generativeai
+google.genai
+langchain_milvus
+docling
+langchain_docling
+sentence-transformers
+langchain
