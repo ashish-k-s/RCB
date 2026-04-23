@@ -253,6 +253,7 @@ load_dotenv()
 
 MAAS_API_KEY = os.environ["MAAS_API_KEY"]
 MAAS_API_BASE = os.environ["MAAS_API_BASE"]
+MAAS_MODEL_NAME = os.environ["MAAS_MODEL_NAME"]
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 GEMINI_API_BASE = os.environ.get("GEMINI_API_BASE")
 

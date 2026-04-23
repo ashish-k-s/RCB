@@ -127,10 +127,12 @@ def init_image_page():
 
 def init_llm_vars():
     load_dotenv()
-    if 'mass_api_key' not in st.session_state:
-        st.session_state.mass_api_key = os.environ["MAAS_API_KEY"]
-    if 'mass_api_base' not in st.session_state:
-        st.session_state.mass_api_base = os.environ["MAAS_API_BASE"]
+    if 'maas_api_key' not in st.session_state:
+        st.session_state.maas_api_key = os.environ["MAAS_API_KEY"]
+    if 'maas_api_base' not in st.session_state:
+        st.session_state.maas_api_base = os.environ["MAAS_API_BASE"]
+    if 'maas_model_name' not in st.session_state:
+        st.session_state.maas_model_name = os.environ["MAAS_MODEL_NAME"]
     if 'gemini_api_key' not in st.session_state:
         st.session_state.gemini_api_key = os.environ.get("GEMINI_API_KEY")
 

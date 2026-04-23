@@ -11,6 +11,7 @@ import os
 
 MAAS_API_KEY = os.environ["MAAS_API_KEY"]
 MAAS_API_BASE = os.environ["MAAS_API_BASE"]
+MAAS_MODEL_NAME = os.environ["MAAS_MODEL_NAME"]
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 GEMINI_API_BASE = os.environ.get("GEMINI_API_BASE")
 
@@ -34,7 +35,7 @@ def call_llm_to_generate_response(model_choice: str, system_prompt: str, user_pr
         llm = ChatOpenAI(
             openai_api_key=MAAS_API_KEY,
             openai_api_base=MAAS_API_BASE,
-            model_name="granite-3-3-8b-instruct",
+            model_name=MAAS_MODEL_NAME,
             temperature=0.05,
             max_tokens=8192,
             streaming=True,
