@@ -22,3 +22,5 @@ docling
 langchain_docling
 sentence-transformers
 langchain
+authlib
+requests

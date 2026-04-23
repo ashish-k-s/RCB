@@ -53,6 +53,8 @@ def init_page():
     display_top_banner()
     load_dotenv()
     st.sidebar.info("Select a page above.")
+    if 'auth_type' not in st.session_state:
+        st.session_state.auth_type = os.getenv("AUTH_TYPE", "Keycloak")
     if 'data_dir' not in st.session_state:
         st.session_state.data_dir = os.getenv("DATA_DIR", "/tmp/rcb_data") 
     if 'user_dir' not in st.session_state:
