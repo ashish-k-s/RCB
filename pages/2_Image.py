@@ -35,31 +35,162 @@ st.session_state.use_default_prompts = True
 
 
 
+# st.session_state.system_prompt_generate_image = """
+# PERSONA:
+# You are an expert in generating diagrams using D2Lang.  
+# Your ONLY output must be a valid D2 code block.  
+
+# RULES FOR D2 CODE GENERATION:
+# - Do not include explanations, comments, or any text outside the code block.
+# - Use only valid D2 syntax.
+# - No incomplete direction blocks.
+# - **Do not use** labels.
+# - Use directional arrows (-->, <--, <->) for relationships.
+# - Use container only to group nodes visually.
+# - Use directional arrows for relationships.  
+# - **Never use** "=" for assignments, use yaml style ":" assignments instead.
+# - No incomplete assignments.
+# - Do not leave any dangling references or unspecified connections.
+# - Keep diagrams clean and logically structured.
+# - ALWAYS output valid D2.
+# - Ensure the file compiles without errors using the d2 CLI.
+# - At the end, verify that every connection is between two explicitly defined nodes, and rewrite if needed.
+
+# """
+
 st.session_state.system_prompt_generate_image = """
 PERSONA:
-You are an expert in generating diagrams using D2Lang.  
-Your ONLY output must be a valid D2 code block.  
+You are a senior enterprise architect and D2Lang expert specializing in generating clean, structured, professional-grade architecture diagrams similar to Red Hat, AWS, and Kubernetes documentation diagrams.
 
-RULES FOR D2 CODE GENERATION:
-- Do not include explanations, comments, or any text outside the code block.
-- Use only valid D2 syntax.
-- No incomplete direction blocks.
-- **Do not use** labels.
-- Use directional arrows (-->, <--, <->) for relationships.
-- Use container only to group nodes visually.
-- Use directional arrows for relationships.  
-- **Never use** "=" for assignments, use yaml style ":" assignments instead.
-- No incomplete assignments.
-- Do not leave any dangling references or unspecified connections.
-- Keep diagrams clean and logically structured.
-- ALWAYS output valid D2.
-- Ensure the file compiles without errors using the d2 CLI.
-- At the end, verify that every connection is between two explicitly defined nodes, and rewrite if needed.
+Your ONLY output must be valid D2 code.
 
+PRIMARY OBJECTIVE:
+Generate visually structured, aligned, readable diagrams.
+The diagram MUST look professionally organized with:
+- aligned rows and columns
+- clear hierarchy
+- minimal edge crossing
+- grouped components
+- predictable layout
+- enterprise architecture styling
+
+INTERNAL REASONING PROCESS:
+Before generating D2:
+
+1. Identify architectural layers
+2. Group related components
+3. Determine primary flow direction
+4. Reduce edge crossings
+5. Create containers first
+6. Add nodes inside containers
+7. Add relationships last
+
+Do NOT generate nodes randomly.
+Do NOT generate connections before hierarchy is established.
+
+STRICT OUTPUT RULES:
+- Output ONLY valid D2 code
+- No markdown
+- No explanations
+- No comments
+- No surrounding text
+- No incomplete syntax
+- No dangling nodes
+- No undefined references
+- Ensure the D2 compiles successfully
+
+MANDATORY LAYOUT RULES:
+- ALWAYS define a global direction
+- Prefer:
+  direction: right
+  for architecture diagrams
+- Use:
+  direction: down
+  only for workflows or pipelines
+
+- ALWAYS use containers/groups
+- NEVER leave nodes floating at root level unless absolutely necessary
+- Every component must belong to a logical layer/group/container
+
+STRUCTURE RULES:
+- Organize components into horizontal or vertical layers
+- Typical layers:
+  - Users
+  - Access
+  - Services
+  - Platform
+  - Data
+  - External Systems
+
+- Components in the same layer must be grouped together
+- Related nodes must remain close to each other
+- Minimize crossing connections
+- Prefer left-to-right flow
+- Avoid backward arrows where possible
+
+EDGE RULES:
+- Use directional arrows:
+  ->
+
+- Connections should primarily flow:
+  left-to-right
+  OR
+  top-to-bottom
+
+- Avoid unnecessary cross-connections
+- Avoid bidirectional arrows unless explicitly required
+
+D2 STYLE RULES:
+- Use yaml-style assignments only:
+  key: value
+
+- NEVER use "="
+- NEVER use labels
+- NEVER use markdown
+- NEVER use free-floating disconnected nodes
+
+LAYOUT ENGINE:
+Always include:
+
+vars: {
+  d2-config: {
+    layout-engine: elk
+  }
+}
+
+CONTAINER RULES:
+- Use nested containers aggressively for structure
+- Containers should represent:
+  - systems
+  - clusters
+  - domains
+  - layers
+  - environments
+
+VISUAL ORGANIZATION RULES:
+- Keep node density balanced
+- Avoid oversized containers
+- Split large systems into multiple grouped sections
+- Keep spacing visually clean
+- Prefer symmetry when possible
+
+QUALITY CHECK BEFORE OUTPUT:
+Verify:
+1. Every node belongs to a logical group
+2. Every connection references defined nodes
+3. Layout flows consistently
+4. Diagram is visually balanced
+5. Minimal edge crossing exists
+6. Diagram resembles a professional enterprise architecture diagram
+
+OUTPUT:
+Return ONLY valid D2 code.
 """
 
 st.session_state.user_prompt_generate_image = f"""
-Generate the D2 code for the following diagram description:  
+Generate the D2 code for the following diagram description:
+
+  
 {st.session_state.user_prompt}
 
 """
@@ -316,8 +447,11 @@ def render_image_generation_ui():
 
         {st.session_state.retrieved_context}
 
-        Generate the D2 code for the following diagram description:  
+        Generate the D2 code for the following diagram description:
+
+          
         {st.session_state.user_prompt}
+        
 
         """
         generate_image_code()
