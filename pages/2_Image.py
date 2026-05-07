@@ -92,7 +92,7 @@ def generate_image_code():
     with st.spinner(f"Generating code for image using {st.session_state.model_choice}..."):
         st.session_state.d2_image_code = call_llm_to_generate_response(st.session_state.model_choice, st.session_state.system_prompt_generate_image, st.session_state.user_prompt_generate_image)
         print("D2LANG CODE: \n", st.session_state.d2_image_code)
-        update_d2_image_code()
+        #update_d2_image_code()
 
 def render_image_from_code():
     print(f"d2_image_code:\n{st.session_state.d2_image_code}")
@@ -271,12 +271,11 @@ def render_image_generation_ui():
     print(f"User directory: {st.session_state.user_dir}")
     generate_image = st.button("Generate Image code", disabled=st.session_state.disable_all)
 
-    st.session_state.d2_image_code = st.text_area(
+    st.text_area(
     "Write or edit your d2lang code here:",
         placeholder="Write your d2lang code here...",
         value=st.session_state.d2_image_code,
         height=300,
-        key="st.session_state.d2_image_code",
         on_change=update_d2_image_code,
         disabled=st.session_state.disable_all
         )
@@ -322,6 +321,7 @@ def render_image_generation_ui():
 
         """
         generate_image_code()
+        update_d2_image_code()
         #render_image_from_code()
 
     if render_image:

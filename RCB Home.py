@@ -16,6 +16,14 @@ import requests
 from rcb_init import init_page
 from rcb_rag_manager import process_uploaded_documents, show_file_content_dialog, clear_uploaded_content
 
+os.environ["TRANSFORMERS_VERBOSITY"] = "error"
+
+import warnings
+warnings.filterwarnings("ignore")
+
+from transformers.utils import logging
+logging.set_verbosity_error()
+
 if 'vectorstore' not in st.session_state:
     st.session_state.vectorstore = None
 if 'retriever' not in st.session_state:

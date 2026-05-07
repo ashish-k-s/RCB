@@ -102,7 +102,6 @@ def init_quickcourse_page():
         st.session_state.logs = []
 
 def init_image_page():
-
     d2_image_name_str = "rcb_generated_image"
     if 'd2_image_code' not in st.session_state:
         st.session_state.d2_image_code = ""
@@ -124,6 +123,9 @@ def init_image_page():
             index=0,
             disabled=st.session_state.disable_all
         )
+    if 'use_rag' not in st.session_state:
+        st.session_state.use_rag = False
+    st.session_state.use_rag = st.sidebar.checkbox("Use RAG",disabled=st.session_state.disable_all)
 
 def init_llm_vars():
     load_dotenv()
