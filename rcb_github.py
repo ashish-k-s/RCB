@@ -157,11 +157,11 @@ def push_to_github():
 
     try:
         repo = Repo(repo_path)
+        origin = repo.remote(name='origin')
+        origin.pull()  # Pull latest changes from remote to avoid conflicts
         repo.git.add(A=True)  # Add all changes
         st.session_state.commit_message = f"{st.session_state.commit_message} \nContent generated using {st.session_state.model_choice} via RCB."
         repo.index.commit(st.session_state.commit_message)  # Commit changes
-        origin = repo.remote(name='origin')
-        origin.pull()  # Pull latest changes from remote to avoid conflicts
         origin.push()  # Push changes to remote
         time.sleep(5)  # Wait for a few seconds to ensure push is complete
         st.session_state.progress_logs.success(f"Changes pushed to GitHub repository '{st.session_state.repo_name}' successfully.")
