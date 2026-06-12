@@ -15,7 +15,6 @@ python-pptx
 pdf2image
 moviepy
 streamlit-bridge
-google.generativeai
 google.genai
 langchain_milvus
 docling

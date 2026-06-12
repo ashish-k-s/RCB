@@ -79,7 +79,8 @@ def call_llm_to_generate_response(model_choice: str, system_prompt: str, user_pr
         for attempt in range(max_retries):
             try:
                 response = client.models.generate_content(
-                    model="gemini-2.5-flash",
+                    model="gemini-3.1-flash-lite",
+                    ##model="gemini-2.5-flash",
                     contents=prompt
                 )
                 break  # If the request is successful, exit the loop
