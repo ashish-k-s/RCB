@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 import time
+from pathlib import Path
 
 
 
@@ -91,6 +92,8 @@ def init_quickcourse_page():
         st.session_state.repo_verified = False
     if 'repo_name' not in st.session_state:
         st.session_state.repo_name = ""
+    if 'repo_name_lang' not in st.session_state:
+        st.session_state.repo_name_lang = ""
     if 'repo_url' not in st.session_state:
         st.session_state.repo_url = ""
     if 'repo_dir' not in st.session_state:
@@ -171,10 +174,11 @@ def init_github_vars():
         st.session_state.is_private = False
 
 def init_quickcourse_vars():
+    if 'quickcourse_action' not in st.session_state:
+        st.session_state.quickcourse_action = "Create"
+
     if 'course_outline' not in st.session_state:
         st.session_state.course_outline = ""
-    # if 'course_structure_file_names' not in st.session_state:
-    #     st.session_state.course_structure_file_names = ""
     if 'context_for_outline' not in st.session_state:
         st.session_state.context_for_outline = ""
     if 'topics_for_outline' not in st.session_state:
@@ -194,14 +198,25 @@ def init_quickcourse_vars():
     # --- Configuration for jinja2 file to generate antora.yml---
     if 'course_outline_file' not in st.session_state:
         st.session_state.course_outline_file = f"{st.session_state.user_dir}/TEMP-outline.adoc"
-    if 'course_structure_file_names' not in st.session_state:
-        st.session_state.course_structure_file_names = f"{st.session_state.user_dir}/TEMP-course_structure_file_names.csv"
+    if 'course_structure_csv' not in st.session_state:
+        st.session_state.course_structure_csv = f"{st.session_state.user_dir}/TEMP-course_structure_csv.csv"
     if 'antora_template_dir' not in st.session_state:
         st.session_state.antora_template_dir = './templates'          # folder where antora.yml.j2 is stored
     if st.session_state.user_dir and st.session_state.repo_name:
         st.session_state.antora_output_file = f"{st.session_state.user_dir}/content/{st.session_state.repo_name}/antora.yml"            # output location
     if st.session_state.user_dir and st.session_state.repo_name:
         st.session_state.antora_pb_file = f"{st.session_state.user_dir}/content/{st.session_state.repo_name}/antora-playbook.yml"
+
+    if 'repo_name_path' not in st.session_state:
+        st.session_state.repo_name_path = Path(st.session_state.repo_name)
+        st.session_state.source_modules = st.session_state.repo_name_path / "modules"
+
+    if 'repo_name_lang_path' not in st.session_state:   
+        st.session_state.repo_name_lang_path = Path(st.session_state.repo_name_lang)
+        st.session_state.target_modules = st.session_state.repo_name_lang_path / "modules"
+
+    if 'adoc_content' not in st.session_state:
+        st.session_state.adoc_content = ""
 
 def init_audio_page():
     sample_gemini_female = "sample/F-gemini.wav"
@@ -475,4 +490,102 @@ def init_audio_prompts():
 
     Text: {st.session_state.curated_transcript}
 
+    """
+
+def init_translation_prompts(target_language):
+    st.session_state.system_prompt_translate_content = f"""
+    You are an expert technical translator specializing in software engineering, Linux, OpenShift, Kubernetes, Ansible, Red Hat technologies, cloud computing, and enterprise IT training content.
+
+    Your task is to translate Antora/AsciiDoc course content from the source language to the target language while preserving the original document structure exactly.
+
+    CRITICAL RULES:
+
+    1. PRESERVE ASCIIDOC STRUCTURE
+    - Do NOT modify AsciiDoc syntax.
+    - Do NOT add or remove lines.
+    - Preserve all headings, anchors, IDs, attributes, tables, lists, admonitions, includes, xrefs, images, and formatting.
+    - Preserve blank lines wherever possible.
+    - Preserve indentation.
+
+    2. DO NOT TRANSLATE
+    - Code blocks
+    - Terminal commands
+    - Command output
+    - File names
+    - URLs
+    - Variable names
+    - Environment variables
+    - API names
+    - Product names unless commonly localized
+    - AsciiDoc attributes such as:
+        :attribute-name:
+    - Include statements
+    - xref references
+    - image references
+    - IDs and anchors:
+        [id="..."]
+        [[...]]
+    - YAML, JSON, XML, INI, TOML, shell scripts, Ansible playbooks, Kubernetes manifests, and other configuration content
+
+    3. TRANSLATE
+    - Explanatory paragraphs
+    - Learning objectives
+    - Procedure descriptions
+    - Notes, warnings, tips, and important messages
+    - Table text intended for learners
+    - Image captions and figure descriptions
+    - Quiz or assessment text
+    - User-facing instructional content
+
+    4. TERMINOLOGY
+    - Maintain consistent terminology throughout the document.
+    - Keep technical terms in English when no widely accepted translation exists.
+    - Preserve product names exactly.
+    - Preserve commands, resource names, package names, and code identifiers exactly.
+
+    5. OUTPUT REQUIREMENTS
+    - Return ONLY the translated AsciiDoc document.
+    - Do NOT provide explanations.
+    - Do NOT wrap the output in markdown code fences.
+    - Do NOT summarize.
+    - Do NOT add translator notes.
+    - Do NOT add introductory or concluding text.
+
+    6. QUALITY REQUIREMENTS
+    - Translation must sound natural to native speakers.
+    - Preserve technical accuracy.
+    - Preserve instructional intent.
+    - Preserve level of formality and educational style.
+
+    7. SPECIAL HANDLING OF CODE BLOCKS
+
+    Any content inside fenced code blocks or source blocks must remain unchanged.
+
+    Examples:
+    [source,bash]
+    ----
+    oc get pods
+    ----
+
+    Must remain exactly unchanged.
+
+    8. SPECIAL HANDLING OF INLINE CODE
+
+    Text enclosed within:
+    `inline code`
+
+    must remain unchanged.
+
+    Your sole output must be the translated AsciiDoc content.    
+    """
+    st.session_state.user_prompt_translate_content = f"""
+    Translate the following Antora/AsciiDoc training content.
+
+    Source Language: English
+
+    Target Language: {target_language}
+
+    Document:
+
+    {st.session_state.adoc_content}
     """

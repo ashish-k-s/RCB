@@ -2,13 +2,14 @@ import streamlit as st
 import os
 import re
 import csv
+import shutil
 
 from jinja2 import Environment, FileSystemLoader
 from pathlib import Path
 from io import StringIO
 
 
-from rcb_init import init_page, init_llm_vars, init_quickcourse_page, add_log, init_quickcourse_vars, init_quickcourse_prompts
+from rcb_init import init_page, init_llm_vars, init_quickcourse_page, add_log, init_quickcourse_vars, init_quickcourse_prompts, init_translation_prompts
 from rcb_llm_manager import call_llm_to_generate_response
 from rcb_rag_manager import retrieve_context
     
@@ -151,9 +152,9 @@ def read_chapter_list(course_structure_csv):
                         st.session_state.progress_logs.info(f"Building page content for topic: {text}")
 
 
-                        print("BUILDING PAGE SUMMARY")
-                        st.session_state.progress_logs.info(f"Building page summary for topic: {text}")
-                        
+                        print("BUILDING DETAILED CONTENT")
+                        st.session_state.progress_logs.info(f"Building detailed content for topic: {text}")
+
                         init_quickcourse_prompts() # Re-initialize prompts to update context and topics
                         response = call_llm_to_generate_response(st.session_state.model_choice, st.session_state.system_prompt_detailed_content, st.session_state.user_prompt_detailed_content)
                         print("PAGE SUMMARY: ", response)
@@ -228,3 +229,89 @@ def generate_antora_yml():
 
     print(f"{st.session_state.antora_output_file} generated with chapters: {chapters}")
     print(f"Topics covered in the training: {st.session_state.desc_chapters}")
+
+def translate_adoc(target_language) -> str:
+    # Perform translation or other processing here
+    init_translation_prompts(target_language)
+    translated_content = call_llm_to_generate_response(st.session_state.model_choice, st.session_state.system_prompt_translate_content, st.session_state.user_prompt_translate_content)
+    return translated_content
+
+def translate_all_adoc_files(target_language: str):
+    st.session_state.show_logs = True
+    for source_file in st.session_state.source_modules.rglob("*.adoc"):
+        if source_file.name == "nav.adoc":
+            st.session_state.progress_logs.info(f"Skipping translation of {source_file}")
+            print(f"Skipping translation of {source_file}")
+            continue
+
+        # st.write(f"Translating {source_file} to {target_language}")
+        # st.session_state.logs.append(f"Translating {source_file} to {target_language}")
+
+        print(f"Translating {source_file} to {target_language}")
+        st.session_state.progress_logs.info(f"Translating {source_file} to {target_language}")
+
+        # Relative path from source modules directory
+        relative_path = source_file.relative_to(st.session_state.source_modules)
+
+        # Corresponding target file path
+        target_file = st.session_state.target_modules / relative_path
+
+        # Create target directory if it doesn't exist
+        target_file.parent.mkdir(parents=True, exist_ok=True)
+
+        # Read source content
+        with open(source_file, "r", encoding="utf-8") as f:
+            st.session_state.adoc_content = f.read()
+
+        # Process content
+        translated_content = translate_adoc(target_language)
+
+        # Write to target location
+        with open(target_file, "w", encoding="utf-8") as f:
+            f.write(translated_content)
+
+        print(f"Processed: {source_file}")
+        print(f"Written to: {target_file}")
+
+def copy_module_assets(src_repo, dst_repo):
+    """
+    Copy directories under modules/*/* except 'pages'.
+
+    Example copies:
+      modules/chapter1/images
+      modules/appendix/attachments
+
+    Example excludes:
+      modules/chapter1/pages
+      modules/chapter1/nav.adoc
+      modules/chapter2/nav.adoc
+    """
+
+    src_modules = Path(src_repo) / "modules"
+    dst_modules = Path(dst_repo) / "modules"
+
+    if not src_modules.exists():
+        raise FileNotFoundError(f"Source modules directory not found: {src_modules}")
+
+    for module_dir in src_modules.iterdir():
+        if not module_dir.is_dir():
+            continue
+
+        # Look only at modules/<module_name>/*
+        for item in module_dir.iterdir():
+            # Skip files (e.g. nav.adoc)
+            if not item.is_dir():
+                continue
+
+            # Skip pages directory
+            if item.name == "pages":
+                continue
+
+            relative_path = item.relative_to(src_modules)
+            destination = dst_modules / relative_path
+
+            print(f"Copying: {item} -> {destination}")
+            st.session_state.progress_logs.info(f"Copying: {item} -> {destination}")
+
+            # Python 3.8+: overwrite existing destination
+            shutil.copytree(item, destination, dirs_exist_ok=True)

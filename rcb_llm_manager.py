@@ -7,6 +7,8 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
 from dotenv import load_dotenv
+import time
+
 import os
 
 MAAS_API_KEY = os.environ["MAAS_API_KEY"]
@@ -73,11 +75,27 @@ def call_llm_to_generate_response(model_choice: str, system_prompt: str, user_pr
         client = genai.Client(
             api_key=st.session_state.gemini_api_key
         )
-
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt
-        )
+        max_retries=5
+        for attempt in range(max_retries):
+            try:
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=prompt
+                )
+                break  # If the request is successful, exit the loop
+            except Exception as e:
+                print(f"Attempt {attempt + 1} failed with error: {e}")
+                if attempt == max_retries - 1:
+                    print("Max retries reached. Exiting.")
+                    return "Error: Unable to get response from Gemini model after multiple attempts."
+                else:
+                    print("Unable to get response from Gemini model. Waiting for 10 seconds before retrying...")
+                    st.session_state.progress_logs.warning("Unable to get response from Gemini model. Waiting for 10 seconds before retrying...")
+                    time.sleep(10)
+        # response = client.models.generate_content(
+        #     model="gemini-2.5-flash",
+        #     contents=prompt
+        # )
 
         print(response.text)
         return response.text

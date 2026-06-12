@@ -77,33 +77,35 @@ def convert_https_to_ssh(https_url: str) -> str:
     else:
         raise ValueError("Invalid GitHub HTTPS URL")
 
-def setup_github_repo():
+
+def setup_github_repo(repo_name):
     init_github_vars()
     with st.spinner("Setting up repository..."):
-        exists = check_github_repo_exists(st.session_state.repo_name)
+        exists = check_github_repo_exists(repo_name)
         if exists:
             st.session_state.repo_verified = True
-            st.session_state.repo_dir = f"{st.session_state.user_dir}/content/{st.session_state.repo_name}"
-            st.markdown("Repository already exists. Content will be overwritten.")
-            st.session_state.repo_url = f"https://github.com/{st.session_state.github_org}/{st.session_state.repo_name}"
-            print(f"Repository '{st.session_state.repo_name}' already exists. Content will be overwritten.")
+            st.session_state.repo_dir = f"{st.session_state.user_dir}/content/{repo_name}"
+            if st.session_state.quickcourse_action == "Create":
+                st.markdown("Repository already exists. Content will be overwritten.")
+            st.session_state.repo_url = f"https://github.com/{st.session_state.github_org}/{repo_name}"
+            print(f"Repository '{repo_name}' already exists. Content will be overwritten.")
             #return True
         elif not exists:
             # If repository does not exist, create it
             st.session_state.repo_verified = False
-            print(f"Creating new repository '{st.session_state.repo_name}'...")
-            repo_created = create_github_repo(st.session_state.repo_name)
+            print(f"Creating new repository '{repo_name}'...")
+            repo_created = create_github_repo(repo_name)
             if repo_created:
                 st.session_state.repo_verified = True
-                st.session_state.repo_dir = f"{st.session_state.user_dir}/content/{st.session_state.repo_name}"
+                st.session_state.repo_dir = f"{st.session_state.user_dir}/content/{repo_name}"
                 st.markdown("Repository created successfully.")
-                st.session_state.repo_url = f"https://github.com/{st.session_state.github_org}/{st.session_state.repo_name}"
-                print(f"Repository '{st.session_state.repo_name}' created successfully.")
+                st.session_state.repo_url = f"https://github.com/{st.session_state.github_org}/{repo_name}"
+                print(f"Repository '{repo_name}' created successfully.")
                 ###return True
             else:
                 st.session_state.repo_verified = False
                 st.session_state.repo_url = ""
-                print(f"Failed to create repository '{st.session_state.repo_name}'. Please check the logs.")
+                print(f"Failed to create repository '{repo_name}'. Please check the logs.")
                 return False
     
     # Show repository link if verified
@@ -114,11 +116,11 @@ def setup_github_repo():
                 # Use a spinner to indicate cloning process
                 with st.spinner("Cloning repository..."):
                     # Clone the repository to a temporary directory
-                    print(f"repo_name: {st.session_state.repo_name} and repo_dir : {st.session_state.repo_dir}")
+                    print(f"repo_name: {repo_name} and repo_dir : {st.session_state.repo_dir}")
                     time.sleep(5)
                     if not st.session_state.repo_dir:
                         ###temp_dir = tempfile.mkdtemp()
-                        st.session_state.repo_dir = f"{st.session_state.user_dir}/content/{st.session_state.repo_name}"
+                        st.session_state.repo_dir = f"{st.session_state.user_dir}/content/{repo_name}"
                         print(f"DEBUG: Set repo_dir to {st.session_state.repo_dir}")
                         st.session_state.repo_dir = Path(st.session_state.repo_dir)
                     if os.path.exists(st.session_state.repo_dir):
@@ -129,28 +131,29 @@ def setup_github_repo():
                     Repo.clone_from(ssh_url, st.session_state.repo_dir)
                     print(f"Repository is cloned at '{st.session_state.repo_dir}'")
                     st.session_state.uploaded_files = os.listdir(st.session_state.repo_dir)
-                    add_log(f"Repository '{st.session_state.repo_name}' from url '{st.session_state.repo_url}' cloned successfully at '{st.session_state.repo_dir}'.")
+                    add_log(f"Repository '{repo_name}' from url '{st.session_state.repo_url}' cloned successfully at '{st.session_state.repo_dir}'.")
                     st.session_state.modules_dir = f"{st.session_state.repo_dir}/modules"
                     print(f"=====DEBUG: Set modules_dir to {st.session_state.modules_dir}")
                     st.session_state.repo_cloned = True
         except Exception as e:
             st.error(f"Failed to clone repository: {e}")
-            add_log(f"Error cloning repository '{st.session_state.repo_name}': {e}")
+            add_log(f"Error cloning repository '{repo_name}': {e}")
             st.session_state.repo_verified = False
             st.session_state.repo_url = ""  
 
         st.session_state.chat_enabled = True
         
-def push_to_github():
+def push_to_github(repo_dir):
     """
     Push the changes to the GitHub repository.
     """
     st.session_state.progress_logs.info(f"Pushing changes to GitHub repository...")
-    if not st.session_state.repo_dir:
+    if not repo_dir:
         st.error("Repository directory is not set. Please verify the repository setup.")
         return
 
-    repo_path = Path(st.session_state.repo_dir)
+    repo_path = Path(repo_dir)
+    repo_name = repo_path.name
     if not repo_path.exists():
         st.error(f"Repository directory '{repo_path}' does not exist.")
         return
@@ -164,8 +167,8 @@ def push_to_github():
         repo.index.commit(st.session_state.commit_message)  # Commit changes
         origin.push()  # Push changes to remote
         time.sleep(5)  # Wait for a few seconds to ensure push is complete
-        st.session_state.progress_logs.success(f"Changes pushed to GitHub repository '{st.session_state.repo_name}' successfully.")
-        print(f"Changes pushed to GitHub repository '{st.session_state.repo_name}' successfully.")
+        st.session_state.progress_logs.success(f"Changes pushed to GitHub repository '{repo_name}' successfully.")
+        print(f"Changes pushed to GitHub repository '{repo_name}' successfully.")
     except Exception as e:
         st.error(f"Failed to push changes: {e}")
 

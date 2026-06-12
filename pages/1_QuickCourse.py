@@ -4,8 +4,7 @@ import os
 import glob
 import shutil
 import time
-
-
+from pathlib import Path
 
 from rcb_init import init_page, init_llm_vars, init_quickcourse_page, init_quickcourse_vars, init_quickcourse_prompts
 
@@ -19,7 +18,7 @@ init_llm_vars()
 init_quickcourse_page()
 init_quickcourse_vars()
 
-from rcb_quickcourse import extract_code_blocks, multiline_to_csv, generate_antora_yml
+from rcb_quickcourse import copy_module_assets, extract_code_blocks, multiline_to_csv, generate_antora_yml, translate_all_adoc_files
 from rcb_rag_manager import retrieve_context
 
 from rcb_github import setup_github_repo, push_to_github, add_github_contributors
@@ -69,6 +68,9 @@ def update_ai_generated_topics():
     #st.rerun()
 
 with st.sidebar:
+
+    st.session_state.quickcourse_action = st.sidebar.selectbox("QuickCourse Action", ["Create", "Transcript", "Translate"],disabled=st.session_state.disable_all)
+
     st.subheader("GitHub Repository")
     repo_name = st.text_input(
         "Repository Name",
@@ -85,145 +87,228 @@ with st.sidebar:
         st.session_state.repo_name = repo_name.strip()
 
     if st.button("Setup Repository", disabled=not st.session_state.repo_name):
-        setup_github_repo()
+        setup_github_repo(st.session_state.repo_name)
         if st.session_state.repo_verified and st.session_state.repo_cloned:
             st.success("Repository setup successfully")
             add_github_contributors(github_contributors)
         else:
             st.error("Failed to setup repository. Contact us for support.")
 
-    if st.session_state.repo_verified:
-        # Show required structure for the course objectives
-        st.markdown("""
-        **Required Structure for Training Objectives:**
+
+    if st.session_state.quickcourse_action == "Create":
+        if st.session_state.repo_verified:
+            # Show required structure for the course objectives
+            st.markdown("""
+            **Required Structure for Training Objectives:**
+                        
+            - Use `=` for course heading
+            - Use `==` for section headings
+            - Use `-` for topics under sections
+            """)
+            st.markdown(f"Repository URL: [View Repository]({st.session_state.repo_url})", unsafe_allow_html=True)
+            st.session_state.chat_enabled = True
+
+
+    if st.session_state.quickcourse_action == "Translate":
+        languages = {
+            "Chinese": "zh",
+            "French": "fr",
+            "German": "de",
+            "Hindi": "hi",
+            "Japanese": "ja",
+            "Portuguese": "pt",
+            "Spanish": "es",
+        }        
+        selected_language = st.sidebar.selectbox(
+            "Select target language for translation",
+            sorted(languages.keys())
+        )
+        target_lang_code = languages[selected_language]
+        print(f"Selected language: {selected_language}, code: {target_lang_code}")
+
+        st.session_state.repo_name_lang = st.session_state.repo_name + f"_{target_lang_code}"
+
+        st.sidebar.write(f"Translated repository name: {st.session_state.repo_name_lang}")
+
+
+
+
+
+
+if st.session_state.quickcourse_action == "Create":
+    if not st.session_state.show_logs: # Hide chat interface if logs are shown
+        if st.session_state.chat_enabled:
+            st.session_state.use_default_prompts = st.checkbox("Use default prompts (Recommended)", value=True, disabled=st.session_state.show_logs)
+
+            if not st.session_state.use_default_prompts:
+                st.markdown("**Make sure you know what you are doing.**")
+                st.markdown("Feel free to contact us if you need any assistance with custom prompts.")
+                init_quickcourse_prompts()
+                with st.expander("Show/Hide prompts"):
+
+                    st.markdown("**System prompt for generating section summary:**")
+                    st.text(st.session_state.system_prompt_page_summary_pre)
+                    st.session_state.system_prompt_page_summary_user = st.text_area(
+                        "User provided system prompt for page summary:", 
+                        height=100, 
+                        value=st.session_state.system_prompt_page_summary_user,
+                        disabled=False,
+                        label_visibility="collapsed"
+                    )
+                    st.text(st.session_state.system_prompt_page_summary_post)
+
+                    st.divider()
+
+                    st.markdown("**User prompt for generating section summary:**")
+                    st.text(st.session_state.user_prompt_page_summary_1)
+                    st.session_state.user_prompt_page_summary_user = st.text_area(
+                        "User provided text for user prompt for page summary:", 
+                        height=100, 
+                        value=st.session_state.user_prompt_page_summary_user,
+                        disabled=False,
+                        label_visibility="collapsed"
+                    )
+
+                    st.markdown("**System prompt for generating detailed content on page:**")
+                    st.text(st.session_state.system_prompt_detailed_content_pre)
+                    st.session_state.system_prompt_detailed_content_user = st.text_area(
+                        "User provided system prompt for page summary:", 
+                        height=100, 
+                        value=st.session_state.system_prompt_detailed_content_user,
+                        disabled=False,
+                        label_visibility="collapsed"
+                    )
+                    st.text(st.session_state.system_prompt_detailed_content_post)
+
+                    st.divider()
+
+                    st.markdown("**User prompt for generating detailed content on page:**")
+                    st.text(st.session_state.user_prompt_detailed_content_pre)
+                    st.session_state.user_prompt_detailed_content_user = st.text_area(
+                        "User provided user prompt for page summary:", 
+                        height=100, 
+                        value=st.session_state.user_prompt_detailed_content_user,
+                        disabled=False,
+                        label_visibility="collapsed"
+                    )
+
+                    st.divider()
+
+
+            # Chat input box
+            topics_outline = st.text_area(
+                "Enter the list of training objectives to be covered:",
+                placeholder="Type the training topics here...",
+                height=300,
+                key="topics_outline",
+                disabled=st.session_state.show_logs
+            )
+            st.session_state.topics_for_outline = topics_outline
+            # Curate topics button
+            if st.button("Curate Topics", disabled=not st.session_state.topics_for_outline.strip()) or st.session_state.show_logs:
+                with st.spinner("Curating provided list of topics..."):
+                    # Retrieve context for outline generation based on the raw objectives text
+                    st.session_state.context_for_outline = retrieve_context(st.session_state.topics_for_outline)
+                    print(f"context for course outline {st.session_state.context_for_outline}")
+
+                    init_quickcourse_prompts() # Re-initialize prompts to update context and topics
+                    st.session_state.ai_generated_topics = call_llm_to_generate_response(st.session_state.model_choice, st.session_state.system_prompt_course_outline, st.session_state.user_prompt_course_outline)
+                    print("Curated objectives: \n", st.session_state.ai_generated_topics)
                     
-        - Use `=` for course heading
-        - Use `==` for section headings
-        - Use `-` for topics under sections
-        """)
-        st.markdown(f"Repository URL: [View Repository]({st.session_state.repo_url})", unsafe_allow_html=True)
-        st.session_state.chat_enabled = True
-
-if not st.session_state.show_logs: # Hide chat interface if logs are shown
-    if st.session_state.chat_enabled:
-        st.session_state.use_default_prompts = st.checkbox("Use default prompts (Recommended)", value=True, disabled=st.session_state.show_logs)
-
-        if not st.session_state.use_default_prompts:
-            st.markdown("**Make sure you know what you are doing.**")
-            st.markdown("Feel free to contact us if you need any assistance with custom prompts.")
-            init_quickcourse_prompts()
-            with st.expander("Show/Hide prompts"):
-
-                st.markdown("**System prompt for generating section summary:**")
-                st.text(st.session_state.system_prompt_page_summary_pre)
-                st.session_state.system_prompt_page_summary_user = st.text_area(
-                    "User provided system prompt for page summary:", 
-                    height=100, 
-                    value=st.session_state.system_prompt_page_summary_user,
-                    disabled=False,
-                    label_visibility="collapsed"
-                )
-                st.text(st.session_state.system_prompt_page_summary_post)
-
-                st.divider()
-
-                st.markdown("**User prompt for generating section summary:**")
-                st.text(st.session_state.user_prompt_page_summary_1)
-                st.session_state.user_prompt_page_summary_user = st.text_area(
-                    "User provided text for user prompt for page summary:", 
-                    height=100, 
-                    value=st.session_state.user_prompt_page_summary_user,
-                    disabled=False,
-                    label_visibility="collapsed"
-                )
-
-                st.markdown("**System prompt for generating detailed content on page:**")
-                st.text(st.session_state.system_prompt_detailed_content_pre)
-                st.session_state.system_prompt_detailed_content_user = st.text_area(
-                    "User provided system prompt for page summary:", 
-                    height=100, 
-                    value=st.session_state.system_prompt_detailed_content_user,
-                    disabled=False,
-                    label_visibility="collapsed"
-                )
-                st.text(st.session_state.system_prompt_detailed_content_post)
-
-                st.divider()
-
-                st.markdown("**User prompt for generating detailed content on page:**")
-                st.text(st.session_state.user_prompt_detailed_content_pre)
-                st.session_state.user_prompt_detailed_content_user = st.text_area(
-                    "User provided user prompt for page summary:", 
-                    height=100, 
-                    value=st.session_state.user_prompt_detailed_content_user,
-                    disabled=False,
-                    label_visibility="collapsed"
-                )
-
-                st.divider()
-
-
-        # Chat input box
-        topics_outline = st.text_area(
-            "Enter the list of training objectives to be covered:",
-            placeholder="Type the training topics here...",
-            height=300,
-            key="topics_outline",
-            disabled=st.session_state.show_logs
-        )
-        st.session_state.topics_for_outline = topics_outline
-        # Curate topics button
-        if st.button("Curate Topics", disabled=not st.session_state.topics_for_outline.strip()) or st.session_state.show_logs:
-            with st.spinner("Curating provided list of topics..."):
-                # Retrieve context for outline generation based on the raw objectives text
-                st.session_state.context_for_outline = retrieve_context(st.session_state.topics_for_outline)
-                print(f"context for course outline {st.session_state.context_for_outline}")
-
-                init_quickcourse_prompts() # Re-initialize prompts to update context and topics
-                st.session_state.ai_generated_topics = call_llm_to_generate_response(st.session_state.model_choice, st.session_state.system_prompt_course_outline, st.session_state.user_prompt_course_outline)
-                print("Curated objectives: \n", st.session_state.ai_generated_topics)
+            # Display response outside of button click handler so it persists
+            if st.session_state.ai_generated_topics:
+                st.subheader("🤖 Curated objectives:")
                 
-        # Display response outside of button click handler so it persists
-        if st.session_state.ai_generated_topics:
-            st.subheader("🤖 Curated objectives:")
-            
-            ai_generated_topics = st.text_area("AI generated topics:", 
-                                    height=300,
-                                    key="ai_generated_topics",
-                                    disabled=st.session_state.show_logs,
-                                    on_change=update_ai_generated_topics)
-            
-            st.session_state.show_proceed_button = True
+                ai_generated_topics = st.text_area("AI generated topics:", 
+                                        height=300,
+                                        key="ai_generated_topics",
+                                        disabled=st.session_state.show_logs,
+                                        on_change=update_ai_generated_topics)
+                
+                st.session_state.show_proceed_button = True
 
 
-        if st.session_state.show_proceed_button:
-            if st.button("Proceed", disabled=st.session_state.show_logs):
-                st.write("Proceeding with the next steps, you may scroll up to check the progress logs...")
-                st.session_state.course_outline = extract_code_blocks(st.session_state.ai_generated_topics)
-                print(f"Extracted outline: {st.session_state.course_outline}")
+            if st.session_state.show_proceed_button:
+                if st.button("Proceed", disabled=st.session_state.show_logs):
+                    st.write("Proceeding with the next steps, you may scroll up to check the progress logs...")
+                    st.session_state.course_outline = extract_code_blocks(st.session_state.ai_generated_topics)
+                    print(f"Extracted outline: {st.session_state.course_outline}")
 
-                st.session_state.course_outline_str = f"""{st.session_state.course_outline[0]}"""
-                print(f"=====DEBUG: course_outline: {st.session_state.course_outline}")
-                print(f"=====DEBUG: course_outline_str: {st.session_state.course_outline_str}")
+                    st.session_state.course_outline_str = f"""{st.session_state.course_outline[0]}"""
+                    print(f"=====DEBUG: course_outline: {st.session_state.course_outline}")
+                    print(f"=====DEBUG: course_outline_str: {st.session_state.course_outline_str}")
 
-                multiline_to_csv(st.session_state.course_outline_str)
+                    multiline_to_csv(st.session_state.course_outline_str)
 
-# Show content generation progress
-if st.session_state.show_logs:
-    st.subheader("Activity Logs")
+    # Show content generation progress
+    if st.session_state.show_logs:
+        st.subheader("Activity Logs")
 
-    # Create scrollable area for logs
-    log_container = st.container()
-    with log_container:
-        log_text = "\n".join(st.session_state.logs) if st.session_state.logs else "No logs available."
-        st.text_area(
-            "Logs",
-            value=log_text,
-            height=300,
-            disabled=True,
-            label_visibility="collapsed"
-        )
-    generate_antora_yml()
-    push_to_github()
-    st.info("Reload the page to start a new QuickCourse creation process.")
+        # Create scrollable area for logs
+        log_container = st.container()
+        with log_container:
+            log_text = "\n".join(st.session_state.logs) if st.session_state.logs else "No logs available."
+            st.text_area(
+                "Logs",
+                value=log_text,
+                height=300,
+                disabled=True,
+                label_visibility="collapsed"
+            )
+        generate_antora_yml()
+        push_to_github(st.session_state.repo_dir)
+        st.info("Reload the page to start a new QuickCourse creation process.")
 
+if st.session_state.quickcourse_action == "Translate":
+    st.session_state.show_logs = True
+    st.write(f"Do you want to translate the QuickCourse `{st.session_state.repo_name}` to **{selected_language}**?")
+    if st.button("Proceed with Translation", disabled=not st.session_state.repo_verified):
+        st.session_state.repo_verified = False
+        st.session_state.repo_cloned = False
+        setup_github_repo(st.session_state.repo_name_lang)
+        if st.session_state.repo_verified and st.session_state.repo_cloned:
+            st.sidebar.success("Repository setup successfully")
+            add_github_contributors(github_contributors)
+        else:
+            st.error("Failed to setup repository. Contact us for support.")
+
+        st.session_state.repo_dir = f"{st.session_state.user_dir}/content/{st.session_state.repo_name}"
+        st.session_state.repo_dir_lang = f"{st.
+        session_state.user_dir}/content/{st.session_state.repo_name_lang}"
+
+        st.session_state.source_repo = Path(st.session_state.repo_dir)
+        st.session_state.target_repo = Path(st.session_state.repo_dir_lang)
+
+        st.session_state.source_modules = st.session_state.source_repo / "modules"
+        st.session_state.target_modules = st.session_state.target_repo / "modules"
+
+        print(f"Translating repository {st.session_state.repo_name} to {selected_language} and saving in new repo {st.session_state.repo_name_lang}")
+        print(f"Source repo path: {st.session_state.repo_dir} and Target repo path: {st.session_state.repo_dir_lang}")
+
+        if os.path.exists(f"{st.session_state.repo_dir_lang}/antora.yml"):
+            os.remove(f"{st.session_state.repo_dir_lang}/antora.yml")
+        print(f"COPYING {st.session_state.repo_dir}/antora.yml to {st.session_state.repo_dir_lang}/antora.yml")
+        shutil.copy2(f"{st.session_state.repo_dir}/antora.yml", f"{st.session_state.repo_dir_lang}/antora.yml")
+
+        if os.path.exists(f"{st.session_state.repo_dir_lang}/antora-playbook.yml"):
+            os.remove(f"{st.session_state.repo_dir_lang}/antora-playbook.yml")
+        print(f"COPYING {st.session_state.repo_dir}/antora-playbook.yml to {st.session_state.repo_dir_lang}/antora-playbook.yml")
+        shutil.copy2(f"{st.session_state.repo_dir}/antora-playbook.yml", f"{st.session_state.repo_dir_lang}/antora-playbook.yml")
+
+        p = Path(f"{st.session_state.repo_dir_lang}/antora.yml")
+        p.write_text(p.read_text().replace(f"{st.session_state.repo_name}", f"{st.session_state.repo_name_lang}"))
+
+        p = Path(f"{st.session_state.repo_dir_lang}/antora-playbook.yml")
+        p.write_text(p.read_text().replace(f"{st.session_state.repo_name}", f"{st.session_state.repo_name_lang}"))
+        p.write_text(p.read_text().replace("REPLACEREPONAME", f"{st.session_state.repo_name_lang}"))
+
+        st.session_state.use_default_prompts = True
+        translate_all_adoc_files(selected_language)
+        print("Translation completed.")
+        st.session_state.progress_logs.info("Translation completed.")
+        push_to_github(st.session_state.repo_dir_lang)
+        copy_module_assets(st.session_state.repo_dir, st.session_state.repo_dir_lang)
+        print("Other assets copied to translated repository.")
+        st.session_state.progress_logs.info("Other assets copied to translated repository.")
+        print(f"Translation of QuickCourse `{st.session_state.repo_name}` to **{selected_language}** completed and pushed to GitHub repository `{st.session_state.repo_name_lang}` successfully.")
+        st.session_state.progress_logs.success(f"Translation of QuickCourse `{st.session_state.repo_name}` to **{selected_language}** completed and pushed to GitHub repository `{st.session_state.repo_name_lang}` successfully.")
