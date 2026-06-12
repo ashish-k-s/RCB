@@ -256,7 +256,8 @@ def freeze_video_segments(video_path, freeze_instructions, output_path):
 
     # Concatenate final timeline
     final = concatenate_videoclips(timeline)
-    final.write_videofile(output_path, codec="libx264", audio_codec="aac")
+    ###final.write_videofile(output_path, codec="libx264", audio_codec="aac")
+    final.write_videofile(output_path, codec="mpeg4", audio_codec="aac")
 
     clip.close()
     final.close()

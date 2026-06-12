@@ -81,7 +81,8 @@ def concat_videos(directory):
         shutil.copy2(video_file, st.session_state.generate_video_file_path)
     else:
         if st.session_state.preserve_audio:
-            command = f"ffmpeg -y -f concat -safe 0 -i {st.session_state.user_temp_dir}/list.txt -c:v libx264 -preset fast -crf 18 -c:a aac -movflags +faststart {st.session_state.generate_video_file_path}  > /dev/null 2>&1"
+            ###command = f"ffmpeg -y -f concat -safe 0 -i {st.session_state.user_temp_dir}/list.txt -c:v libx264 -preset fast -crf 18 -c:a aac -movflags +faststart {st.session_state.generate_video_file_path}  > /dev/null 2>&1"
+            command = f"ffmpeg -y -f concat -safe 0 -i {st.session_state.user_temp_dir}/list.txt -c:v mpeg4 -preset fast -crf 18 -c:a aac -movflags +faststart {st.session_state.generate_video_file_path}  > /dev/null 2>&1"
         else:
             command = f"ffmpeg -y -f concat -safe 0 -i {st.session_state.user_temp_dir}/list.txt -c:v libx264 -preset fast -crf 18 -an {st.session_state.generate_video_file_path}  > /dev/null 2>&1"
         print("Executing command to concatenate:", command)
