@@ -90,7 +90,7 @@ def call_llm_to_generate_response(model_choice: str, system_prompt: str, user_pr
                     print("Max retries reached. Exiting.")
                     return "Error: Unable to get response from Gemini model after multiple attempts."
                 else:
-                    print("Unable to get response from Gemini model. Waiting for 10 seconds before retrying...")
+                    print(f"Unable to get response from Gemini model. Waiting for 10 seconds before retrying, attempt #{attempt}...")
                     st.session_state.progress_logs.warning("Unable to get response from Gemini model. Waiting for 10 seconds before retrying...")
                     time.sleep(10)
         # response = client.models.generate_content(

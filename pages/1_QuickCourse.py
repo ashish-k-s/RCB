@@ -6,7 +6,7 @@ import shutil
 import time
 from pathlib import Path
 
-from rcb_init import init_page, init_llm_vars, init_quickcourse_page, init_quickcourse_vars, init_quickcourse_prompts
+from rcb_init import init_page, init_llm_vars, init_quickcourse_page, init_quickcourse_vars, init_quickcourse_prompts, init_audio_vars, init_audio_page, init_audio_prompts
 
 st.title("Build QuickCourse using RCB")
 if 'current_page' not in st.session_state:
@@ -18,7 +18,8 @@ init_llm_vars()
 init_quickcourse_page()
 init_quickcourse_vars()
 
-from rcb_quickcourse import copy_module_assets, extract_code_blocks, multiline_to_csv, generate_antora_yml, translate_all_adoc_files
+from rcb_quickcourse import copy_module_assets, extract_code_blocks, multiline_to_csv, generate_antora_yml, translate_all_adoc_files, create_transcript_all, generate_audio_all, update_adocs_for_audio
+
 from rcb_rag_manager import retrieve_context
 
 from rcb_github import setup_github_repo, push_to_github, add_github_contributors
@@ -69,7 +70,7 @@ def update_ai_generated_topics():
 
 with st.sidebar:
 
-    st.session_state.quickcourse_action = st.sidebar.selectbox("QuickCourse Action", ["Create", "Transcript", "Translate"],disabled=st.session_state.disable_all)
+    st.session_state.quickcourse_action = st.sidebar.selectbox("QuickCourse Action", ["Create", "Translate", "Transcript"],disabled=st.session_state.disable_all)
 
     st.subheader("GitHub Repository")
     repo_name = st.text_input(
@@ -129,11 +130,6 @@ with st.sidebar:
         st.session_state.repo_name_lang = st.session_state.repo_name + f"_{target_lang_code}"
 
         st.sidebar.write(f"Translated repository name: {st.session_state.repo_name_lang}")
-
-
-
-
-
 
 if st.session_state.quickcourse_action == "Create":
     if not st.session_state.show_logs: # Hide chat interface if logs are shown
@@ -256,6 +252,8 @@ if st.session_state.quickcourse_action == "Create":
                 label_visibility="collapsed"
             )
         generate_antora_yml()
+        st.session_state.commit_message = os.environ["COMMIT_MESSAGE"] 
+        st.session_state.commit_message = f"{st.session_state.commit_message} \nContent generated using {st.session_state.model_choice} via RCB."
         push_to_github(st.session_state.repo_dir)
         st.info("Reload the page to start a new QuickCourse creation process.")
 
@@ -303,12 +301,46 @@ if st.session_state.quickcourse_action == "Translate":
         p.write_text(p.read_text().replace("REPLACEREPONAME", f"{st.session_state.repo_name_lang}"))
 
         st.session_state.use_default_prompts = True
-        translate_all_adoc_files(selected_language)
-        print("Translation completed.")
-        st.session_state.progress_logs.info("Translation completed.")
-        push_to_github(st.session_state.repo_dir_lang)
-        copy_module_assets(st.session_state.repo_dir, st.session_state.repo_dir_lang)
-        print("Other assets copied to translated repository.")
-        st.session_state.progress_logs.info("Other assets copied to translated repository.")
-        print(f"Translation of QuickCourse `{st.session_state.repo_name}` to **{selected_language}** completed and pushed to GitHub repository `{st.session_state.repo_name_lang}` successfully.")
-        st.session_state.progress_logs.success(f"Translation of QuickCourse `{st.session_state.repo_name}` to **{selected_language}** completed and pushed to GitHub repository `{st.session_state.repo_name_lang}` successfully.")
+        if translate_all_adoc_files(selected_language):
+            print("Translation completed.")
+            st.session_state.progress_logs.info("Translation completed.")
+            st.session_state.commit_message = os.environ["COMMIT_MESSAGE"] 
+            st.session_state.commit_message = f"{st.session_state.commit_message} \nContent translated using {st.session_state.model_choice} via RCB."
+            push_to_github(st.session_state.repo_dir_lang)
+            copy_module_assets(st.session_state.repo_dir, st.session_state.repo_dir_lang)
+            print("Other assets copied to translated repository.")
+            st.session_state.progress_logs.info("Other assets copied to translated repository.")
+            print(f"Translation of QuickCourse `{st.session_state.repo_name}` to **{selected_language}** completed and pushed to GitHub repository `{st.session_state.repo_name_lang}` successfully.")
+            st.session_state.progress_logs.success(f"Translation of QuickCourse `{st.session_state.repo_name}` to **{selected_language}** completed and pushed to GitHub repository `{st.session_state.repo_name_lang}` successfully.")
+
+if st.session_state.quickcourse_action == "Transcript":
+    # st.session_state.provided_transcript = ""
+    # st.session_state.curated_transcript = ""
+    init_audio_page()
+    init_audio_vars()
+    st.session_state.use_default_prompts = True
+
+    print(f"Repo name: {st.session_state.repo_name}")
+    print(f"Model choice: {st.session_state.model_choice}")
+    print(f"Repo path: {st.session_state.repo_dir}")
+    if not st.session_state.repo_verified:
+        st.info("Please setup the GitHub repository first before generating transcript or audio.")
+    else:
+        st.write(f"Do you want to create the transcript text for `{st.session_state.repo_name}` using **{st.session_state.model_choice}**")
+        if st.button("Create Transcript", disabled=not st.session_state.repo_verified):
+            if create_transcript_all():
+                st.session_state.commit_message = os.environ["COMMIT_MESSAGE"] 
+                st.session_state.commit_message = f"{st.session_state.commit_message} \nTranscript text generated using {st.session_state.model_choice} via RCB."
+            push_to_github(st.session_state.repo_dir)
+
+        st.write(f"Do you want to record audio for the transcript using **{st.session_state.tts_choice}** with **{st.session_state.voice_type_mf}** voice?")
+        if st.button("Generate Audio", disabled=not st.session_state.repo_verified):
+            if generate_audio_all():
+                st.session_state.progress_logs.info("Transcript audio generated successfully.")
+                print("Transcript audio generated successfully.")
+                st.session_state.progress_logs.info("Updating .adoc files to include audio and transcript attributes...")
+                print("Updating .adoc files to include audio and transcript attributes...")
+                update_adocs_for_audio()
+                st.session_state.commit_message = os.environ["COMMIT_MESSAGE"] 
+                st.session_state.commit_message = f"{st.session_state.commit_message} \nTranscript audio generated using {st.session_state.tts_choice} via RCB."
+                push_to_github(st.session_state.repo_dir)

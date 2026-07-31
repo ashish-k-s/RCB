@@ -3,6 +3,7 @@ from pathlib import Path
 import streamlit as st
 import subprocess
 import shutil
+import time
 
 from streamlit import text_input
 
@@ -73,7 +74,20 @@ def generate_audio_file_from_transcript():
     if st.session_state.tts_choice == "PiperTTS":
         generate_audio_file_from_transcript_piper_tts()
     elif st.session_state.tts_choice == "GeminiTTS":
-        generate_audio_file_from_transcript_gemini_tts()
+        max_retries=5
+        for attempt in range(max_retries):
+            try:
+                generate_audio_file_from_transcript_gemini_tts()
+                break  # If the request is successful, exit the loop
+            except Exception as e:
+                print(f"Attempt {attempt + 1} failed with error: {e}")
+                if attempt == max_retries - 1:
+                    print("Max retries reached. Exiting.")
+                    return "Error: Unable to get response from Gemini TTS model after multiple attempts."
+                else:
+                    print("Unable to get response from Gemini TTS model. Waiting for 30 seconds before retrying...")
+                    st.session_state.progress_logs.warning("Unable to get response from Gemini TTS model. Waiting for 30 seconds before retrying...")
+                    time.sleep(30)
 
 def generate_audio_file_from_transcript_piper_tts():
         print("Generating audio file using Piper TTS...")
@@ -125,7 +139,7 @@ def gemini_tts_wave_file(filename, pcm, channels=1, rate=24000, sample_width=2):
     print(f"Sample width: {sample_width}")
     print(f"Data length: {len(pcm)} bytes")
 
-    with wave.open(filename, "wb") as wf:
+    with wave.open(str(filename), "wb") as wf:
         wf.setnchannels(channels)
         wf.setsampwidth(sample_width)
         wf.setframerate(rate)

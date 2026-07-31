@@ -3,15 +3,17 @@ import os
 import re
 import csv
 import shutil
+import time
 
 from jinja2 import Environment, FileSystemLoader
 from pathlib import Path
 from io import StringIO
 
 
-from rcb_init import init_page, init_llm_vars, init_quickcourse_page, add_log, init_quickcourse_vars, init_quickcourse_prompts, init_translation_prompts
+from rcb_init import init_page, init_llm_vars, init_quickcourse_page, add_log, init_quickcourse_vars, init_quickcourse_prompts, init_translation_prompts, init_transcript_prompts
 from rcb_llm_manager import call_llm_to_generate_response
 from rcb_rag_manager import retrieve_context
+from rcb_audio import generate_audio_file_from_transcript
     
 def extract_code_blocks(text):
     """
@@ -236,13 +238,26 @@ def translate_adoc(target_language) -> str:
     translated_content = call_llm_to_generate_response(st.session_state.model_choice, st.session_state.system_prompt_translate_content, st.session_state.user_prompt_translate_content)
     return translated_content
 
+def create_transcript_adoc(adoc_content) -> str:
+    # Perform transcript creation here
+    init_transcript_prompts()
+    transcript_txt = call_llm_to_generate_response(st.session_state.model_choice, st.session_state.system_prompt_create_transcript, st.session_state.user_prompt_create_transcript)
+    return transcript_txt
+
 def translate_all_adoc_files(target_language: str):
     st.session_state.show_logs = True
     for source_file in st.session_state.source_modules.rglob("*.adoc"):
+        # Corresponding target file path
+        target_file = st.session_state.target_modules / relative_path
+
+        # Create target directory if it doesn't exist
+        target_file.parent.mkdir(parents=True, exist_ok=True)
+
+        print(f"Processing {source_file} for translation to {target_language} at {target_file}")
         if source_file.name == "nav.adoc":
-            st.session_state.progress_logs.info(f"Skipping translation of {source_file}")
-            print(f"Skipping translation of {source_file}")
-            continue
+            st.session_state.progress_logs.info(f"Copying {source_file}")
+            print(f"Copying {source_file}")
+            shutil.copy2(source_file, target_file)
 
         # st.write(f"Translating {source_file} to {target_language}")
         # st.session_state.logs.append(f"Translating {source_file} to {target_language}")
@@ -252,12 +267,6 @@ def translate_all_adoc_files(target_language: str):
 
         # Relative path from source modules directory
         relative_path = source_file.relative_to(st.session_state.source_modules)
-
-        # Corresponding target file path
-        target_file = st.session_state.target_modules / relative_path
-
-        # Create target directory if it doesn't exist
-        target_file.parent.mkdir(parents=True, exist_ok=True)
 
         # Read source content
         with open(source_file, "r", encoding="utf-8") as f:
@@ -272,6 +281,7 @@ def translate_all_adoc_files(target_language: str):
 
         print(f"Processed: {source_file}")
         print(f"Written to: {target_file}")
+    return True
 
 def copy_module_assets(src_repo, dst_repo):
     """
@@ -315,3 +325,124 @@ def copy_module_assets(src_repo, dst_repo):
 
             # Python 3.8+: overwrite existing destination
             shutil.copytree(item, destination, dirs_exist_ok=True)
+
+
+def generate_audio_all():
+    print(f"Generating audio for all .txt files in {st.session_state.repo_name} using model {st.session_state.model_choice}")
+    st.session_state.repo_path = Path(st.session_state.repo_dir) / "modules"
+    print(f"Repo path for audio generation: {st.session_state.repo_path}")
+
+    for txt_file in st.session_state.repo_path.rglob("*.txt"):
+        print(f"Processing transcript for {txt_file}")
+        p = Path(txt_file)
+        images_dir = p.parent.parent / "images"
+        images_dir.mkdir(parents=True, exist_ok=True)
+        transcript_wav_file = images_dir / f"{p.stem}.wav"
+        print(f"Audio file path: {transcript_wav_file}")
+        if transcript_wav_file.is_file():
+            print(f"Audio file already exists: {transcript_wav_file}")
+            st.session_state.progress_logs.info(f"Audio file already exists: {transcript_wav_file}")
+            time.sleep(1)
+            continue
+        print(f"Generating audio for {txt_file} in {transcript_wav_file} file")
+        st.session_state.progress_logs.info(f"Generating audio for {txt_file} in {transcript_wav_file} file")
+
+        # Read source content
+        # with open(txt_file, "r", encoding="utf-8") as f:
+        #     st.session_state.transcript_txt_content = f.read()
+        st.session_state.default_audio_file_path_txt = txt_file
+        st.session_state.default_audio_file_path_wav = transcript_wav_file
+        st.session_state.default_audio_file_path_mp3 = str(transcript_wav_file).replace(".wav",".mp3")
+        generate_audio_file_from_transcript()
+
+        print(f"Processed: {txt_file}")
+        print(f"Written to: {transcript_wav_file}")
+    st.session_state.progress_logs.info(f"Audio generation completed for all .txt files in {st.session_state.repo_name}")
+    return True
+
+def create_transcript_all():
+    print(f"Creating transcript for all .adoc files in {st.session_state.repo_name} using model {st.session_state.model_choice}")
+    st.session_state.show_logs = True
+    st.session_state.repo_path = Path(st.session_state.repo_dir) / "modules"
+
+    for adoc_file in st.session_state.repo_path.rglob("*.adoc"):
+        print(f"Processing transcript for {adoc_file}")
+        ## QuickCourse repo supports json file for transcript with timestamp. Creation of JSON file with timestamp to be implemented in the future.
+        p = Path(adoc_file)
+        images_dir = p.parent.parent / "images"
+        images_dir.mkdir(parents=True, exist_ok=True)
+        transcript_txt_file = images_dir / f"{p.stem}.txt"
+        print(f"Teanscript file path: {transcript_txt_file}")
+        if adoc_file.name == "nav.adoc":
+            st.session_state.progress_logs.info(f"Skipping transript for {adoc_file}")
+            print(f"Skipping transcript for {adoc_file}")
+            st.session_state.progress_logs.info(f"Skipping creation of transcript for {adoc_file}")
+            continue
+
+        # adoc_file_txt = str(Path(adoc_file).with_suffix(".txt"))
+        ## Skip creation of transcript if it already exists
+        if transcript_txt_file.exists():
+            st.session_state.progress_logs.info(f"Transcript file already exists: {transcript_txt_file}")
+            print(f"Transcript file already exists: {transcript_txt_file}")
+            time.sleep(1)
+            continue
+        print(f"Creating transcript for {adoc_file} in {transcript_txt_file} file")
+        st.session_state.progress_logs.info(f"Creating transcript for {adoc_file} in {transcript_txt_file} file")
+
+        # Read source content
+        with open(adoc_file, "r", encoding="utf-8") as f:
+            st.session_state.adoc_content = f.read()
+
+        # Process content
+        transcript_txt = create_transcript_adoc(st.session_state.adoc_content)
+
+        # Write to target location
+        with open(transcript_txt_file, "w", encoding="utf-8") as f:
+            f.write(transcript_txt)
+
+        print(f"Processed: {adoc_file}")
+        print(f"Written to: {transcript_txt_file}")
+        ## Delete the audio files associated with the transcript
+        audio_file = images_dir / f"{p.stem}.wav"
+        if audio_file.exists():
+            st.session_state.progress_logs.info(f"Deleting audio file: {audio_file}")
+            audio_file.unlink()
+            print(f"Deleted audio file: {audio_file}")
+    st.session_state.progress_logs.info(f"Transcript creation completed for all .adoc files in {st.session_state.repo_name}")
+    return True
+
+def update_adocs_for_audio():
+    st.session_state.progress_logs.info("Updating .adoc files to include audio and transcript attributes")
+    for adoc_file in st.session_state.repo_path.rglob("*.adoc"):
+        file_path = Path(adoc_file)
+        audio_line = f":page-audio-src: {file_path.stem}.wav"
+        transcript_line = f":page-transcript-src: {file_path.stem}.txt"
+
+        with open(file_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+
+        # Idempotency check
+        content = "".join(lines)
+        if audio_line in content and transcript_line in content:
+            print("Attributes already present. No changes made.")
+            st.session_state.progress_logs.info(f"Attributes already present in {file_path}. No changes made.")
+        else:
+            new_lines = []
+            inserted = False
+
+            for line in lines:
+                new_lines.append(line)
+
+                if not inserted and line.startswith("= "):
+                    if audio_line not in content:
+                        new_lines.append(audio_line + "\n")
+                    if transcript_line not in content:
+                        new_lines.append(transcript_line + "\n")
+                    inserted = True
+
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.writelines(new_lines)
+
+            print("Attributes added.")
+            st.session_state.progress_logs.info(f"Attributes added to {st.session_state.repo_name}.")
+    # return True            

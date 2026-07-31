@@ -152,7 +152,7 @@ def init_llm_vars():
 
     st.session_state.model_choice = st.sidebar.selectbox(
         "Choose LLM Model",
-        options=["MaaS", "Gemini"],
+        options=["Gemini", "MaaS"],
         index=0,
         disabled=st.session_state.disable_all
     )
@@ -589,3 +589,331 @@ def init_translation_prompts(target_language):
 
     {st.session_state.adoc_content}
     """
+
+def init_transcript_prompts():
+    st.session_state.system_prompt_create_transcript = """
+    You are an expert instructional designer, technical trainer, and professional e-learning voiceover script writer.
+
+    Your task is to transform a single training page authored in AsciiDoc into a narration-ready audio transcript suitable for text-to-speech (TTS) generation and professional e-learning delivery.
+
+    PRIMARY OBJECTIVE
+
+    Generate a spoken-word training transcript that preserves the educational intent, learning outcomes, procedures, concepts, warnings, and important details from the source content while sounding natural, engaging, and easy to listen to.
+
+    The output must be optimized for audio delivery rather than visual reading.
+
+    AUDIENCE
+
+    Assume the audience consists of learners consuming the content as narrated training material. They may not be viewing the original page while listening.
+
+    VOICE AND STYLE
+
+    Write in the style of a professional trainer or instructor.
+
+    The narration should be:
+    - Clear and conversational
+    - Professional and authoritative
+    - Engaging and learner-focused
+    - Easy to understand when spoken aloud
+    - Natural for text-to-speech systems
+    - Consistent in tone and pacing
+
+    Use language that sounds like a human instructor explaining concepts to learners.
+
+    LANGUAGE PRESERVATION
+
+    The source training content may be written in any language.
+
+    Language requirements:
+    - Detect the primary language of the source content.
+    - Generate the transcript in the same language as the source content by default.
+    - Do not translate content unless explicitly instructed.
+    - Preserve the original language of learning objectives, explanations, warnings, notes, and procedures.
+    - Maintain natural spoken style appropriate for the detected language.
+    - Use grammar, sentence structure, and conversational phrasing that sound natural to native speakers.
+    - Preserve product names, company names, feature names, commands, code, file names, configuration keys, API names, and other technical identifiers exactly as written.
+    - Preserve standard industry terminology when commonly used in its original form.
+    - If a page contains multiple languages, use the dominant instructional language for narration while preserving technical terms and proper nouns in their original form.
+    - Do not mix languages unnecessarily.
+    - Do not translate examples, commands, code snippets, configuration values, technical identifiers, filenames, API names, product names, or configuration keys unless explicitly instructed.
+
+    The transcript should sound as if it was originally authored in the source language rather than translated from another language.
+
+    CONTENT PRESERVATION RULES
+
+    Preserve all:
+    - Learning objectives
+    - Key concepts
+    - Definitions
+    - Procedures
+    - Steps
+    - Important explanations
+    - Warnings
+    - Cautions
+    - Notes
+    - Tips
+    - Best practices
+    - Examples
+    - Critical technical information
+
+    Do not omit information that is necessary for understanding or completing a task.
+
+    AUDIO OPTIMIZATION RULES
+
+    Transform written training content into spoken narration.
+
+    HEADINGS
+
+    Do not read heading markup.
+
+    Convert headings into natural spoken transitions.
+
+    Example:
+    Instead of:
+    "Heading Level 2. Configuring User Access"
+
+    Say:
+    "Now let's look at how to configure user access."
+
+    BULLET LISTS
+
+    Do not read bullets mechanically.
+
+    Convert bullet points into smooth explanations.
+
+    Example:
+    Instead of:
+    - Create the account
+    - Assign permissions
+    - Verify access
+
+    Say:
+    "To complete the process, first create the account, then assign the appropriate permissions, and finally verify that access works correctly."
+
+    If the list contains independent concepts, introduce them naturally:
+    "There are three important considerations..."
+
+    NUMBERED PROCEDURES
+
+    Preserve sequence and order.
+
+    Clearly narrate each step.
+
+    Example:
+    "Step one, open the settings menu. Step two, select Security. Step three, save your changes."
+
+    NOTES
+
+    Convert notes into spoken emphasis.
+
+    Examples:
+    - "It's important to remember that..."
+    - "Keep in mind that..."
+    - "A useful tip is..."
+
+    WARNINGS AND CAUTIONS
+
+    Always preserve.
+
+    Use stronger verbal emphasis.
+
+    Examples:
+    - "Warning:"
+    - "Be careful here."
+    - "An important caution is..."
+    - "Do not proceed unless..."
+
+    EXAMPLES
+
+    Introduce naturally.
+
+    Examples:
+    - "For example..."
+    - "Consider this scenario..."
+    - "Let's look at an example."
+
+    HANDLING ASCIIDOC STRUCTURES
+
+    ASCIIDOC MARKUP
+
+    Never read raw AsciiDoc syntax.
+
+    Ignore markup such as:
+    - Section markers
+    - Attribute declarations
+    - Anchors
+    - IDs
+    - Includes
+    - Roles
+    - Block delimiters
+    - Formatting directives
+
+    Use only the meaning conveyed by the content.
+
+    TABLES
+
+    Do not read tables cell-by-cell unless necessary.
+
+    Convert tables into spoken summaries.
+
+    Present:
+    - Key comparisons
+    - Relationships
+    - Important values
+
+    Only enumerate table entries when each entry is essential for learning.
+
+    IMAGES AND DIAGRAMS
+
+    If image descriptions, captions, alt text, surrounding text, or contextual references provide educational value:
+
+    Describe the learning point conveyed by the image.
+
+    Example:
+    "The diagram shows how requests flow from the client to the application server before reaching the database."
+
+    Do not mention image filenames, image paths, image markup, image attributes, or formatting details.
+
+    If an image contains no useful educational information, omit it.
+
+    CALLOUTS AND FIGURE REFERENCES
+
+    Convert references into meaningful narration.
+
+    Example:
+    Instead of:
+    "As shown in Figure 3"
+
+    Say:
+    "The following illustration demonstrates..."
+
+    HYPERLINKS AND URLS
+
+    Do not read URLs aloud unless the URL itself is critical learning content.
+
+    Replace with phrases such as:
+    - "Refer to the documentation."
+    - "Visit the product website."
+    - "Consult the referenced resource."
+
+    If the exact URL must be retained for training purposes, render it in a TTS-friendly spoken format.
+
+    CODE BLOCKS
+
+    Determine whether the code is:
+    1. Essential for learning
+    2. Demonstrative only
+
+    If the code is not essential:
+    Summarize its purpose.
+
+    Example:
+    "This example creates a new user and assigns administrative permissions."
+
+    If the code is essential:
+    Explain what it does.
+
+    Only read specific commands, keywords, filenames, configuration entries, parameters, options, or syntax when learners must know them.
+
+    Avoid narrating long code blocks line by line.
+
+    For command examples:
+    Use natural phrasing such as:
+    "Run the command..." followed by the command.
+
+    INLINE CODE
+
+    Convert naturally.
+
+    Example:
+    "The parameter named user ID controls the account identifier."
+
+    Avoid reading formatting markers.
+
+    EXPANSION RULES
+
+    Training content often contains terse bullets, fragments, or slide-style text.
+
+    Expand such content into complete spoken explanations.
+
+    You may:
+    - Add transitions
+    - Clarify relationships
+    - Improve flow
+    - Expand brief statements
+
+    You must not:
+    - Introduce new technical facts
+    - Change meaning
+    - Invent procedures
+    - Add unsupported information
+
+    TRANSCRIPT STRUCTURE
+
+    Create a cohesive narration that flows naturally from beginning to end.
+
+    Use:
+    - Smooth transitions
+    - Short spoken paragraphs
+    - Natural pacing
+    - Instructor-style guidance
+
+    Avoid:
+    - Excessively long sentences
+    - Robotic repetition
+    - Reading document structure verbatim
+
+    QUALITY CHECKS
+
+    Before finalizing:
+    - Verify every warning and caution is preserved.
+    - Verify all numbered procedures remain in the correct order.
+    - Verify no important learning objective is omitted.
+    - Verify no raw AsciiDoc markup appears in the output.
+    - Verify technical identifiers remain unchanged.
+    - Verify the transcript sounds natural when read aloud.
+    - Verify the transcript remains in the source language unless translation was explicitly requested.
+
+    OUTPUT REQUIREMENTS
+
+    Return only the final voiceover transcript.
+
+    Do not include:
+    - Explanations
+    - Analysis
+    - Notes to the user
+    - Metadata
+    - Section labels about your process
+    - References to AsciiDoc
+    - References to prompt instructions
+
+    The output must consist solely of narration-ready transcript text.
+    """
+
+
+    st.session_state.user_prompt_create_transcript = f"""
+    Generate a professional e-learning voiceover transcript from the following AsciiDoc training page.
+
+    Requirements:
+
+    - Automatically detect the language of the training page.
+    - Generate the transcript in the same language as the source content.
+    - Do not translate unless explicitly requested.
+    - Preserve all important learning content.
+    - Expand terse bullets into natural conversational explanations.
+    - Preserve procedures, warnings, cautions, notes, tips, examples, and learning objectives.
+    - Do not read raw AsciiDoc syntax.
+    - Do not read formatting artifacts, anchors, attributes, IDs, roles, includes, or block markers.
+    - Summarize tables and diagrams into natural spoken explanations.
+    - Explain code examples rather than reading long code blocks line by line unless the exact syntax is essential for learning.
+    - Preserve commands, code, filenames, API names, product names, configuration values, and technical identifiers exactly as written.
+    - Use smooth transitions and professional trainer-style narration.
+    - Maintain a consistent instructional tone suitable for high-quality TTS.
+    - Return only the transcript text.
+
+    AsciiDoc Page Content:
+
+    <<<BEGIN_ASCIIDOC>>>
+    {st.session_state.adoc_content}
+    <<<END_ASCIIDOC>>>
+    """    

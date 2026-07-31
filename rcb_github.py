@@ -163,7 +163,10 @@ def push_to_github(repo_dir):
         origin = repo.remote(name='origin')
         origin.pull()  # Pull latest changes from remote to avoid conflicts
         repo.git.add(A=True)  # Add all changes
-        st.session_state.commit_message = f"{st.session_state.commit_message} \nContent generated using {st.session_state.model_choice} via RCB."
+        if not repo.is_dirty() and not repo.untracked_files:
+            st.session_state.progress_logs.info(f"No changes to push for repository '{repo_name}'.")
+            print(f"No changes to push for repository '{repo_name}'.")
+            return
         repo.index.commit(st.session_state.commit_message)  # Commit changes
         origin.push()  # Push changes to remote
         time.sleep(5)  # Wait for a few seconds to ensure push is complete
