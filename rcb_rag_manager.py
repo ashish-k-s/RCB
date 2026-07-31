@@ -233,14 +233,43 @@ def generate_rag_db(file_path):
     embeddings = get_embedding()
     persist_dir = f"{st.session_state.user_dir}/rag_db"
 
+    ## Create rag_db directory directory if it does not exists
+    if not os.path.exists(f"{persist_dir}"):
+        os.makedirs(f"{persist_dir}")
+
     if os.path.exists(persist_dir):
         # Load existing vectorstore and add new documents
         vectorstore = Chroma(persist_directory=persist_dir, embedding_function=embeddings)
+
+        print("Persist dir:", persist_dir)
+        print("Writable:", os.access(persist_dir, os.W_OK))
+
+        db_file = os.path.join(persist_dir, "chroma.sqlite3")
+        print("DB exists:", os.path.exists(db_file))
+
+        if os.path.exists(db_file):
+            print("DB writable:", os.access(db_file, os.W_OK))
+
+
         vectorstore.add_documents(final_splits)
+
+
+        vectorstore = Chroma(
+            persist_directory=persist_dir,
+            embedding_function=embeddings,
+        )
+
+        print(vectorstore._persist_directory)
+
+
     else:
         # Create new vectorstore
         if os.path.exists(persist_dir):
             shutil.rmtree(persist_dir)
+
+        print(persist_dir)
+        print(os.access(persist_dir, os.W_OK))
+            
         print(f"Creating new RAG vectorstore at: {persist_dir}")
         vectorstore = Chroma.from_documents(documents=final_splits, embedding=embeddings, persist_directory=persist_dir)
 
