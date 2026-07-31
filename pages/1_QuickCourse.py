@@ -271,8 +271,7 @@ if st.session_state.quickcourse_action == "Translate":
             st.error("Failed to setup repository. Contact us for support.")
 
         st.session_state.repo_dir = f"{st.session_state.user_dir}/content/{st.session_state.repo_name}"
-        st.session_state.repo_dir_lang = f"{st.
-        session_state.user_dir}/content/{st.session_state.repo_name_lang}"
+        st.session_state.repo_dir_lang = f"{st.session_state.user_dir}/content/{st.session_state.repo_name_lang}"
 
         st.session_state.source_repo = Path(st.session_state.repo_dir)
         st.session_state.target_repo = Path(st.session_state.repo_dir_lang)
