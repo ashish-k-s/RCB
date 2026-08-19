@@ -592,19 +592,18 @@ def init_translation_prompts(target_language):
 
 def init_transcript_prompts():
     st.session_state.system_prompt_create_transcript = """
+    ROLE: 
     You are an expert instructional designer, technical trainer, and professional e-learning voiceover script writer.
-
     Your task is to transform a single training page authored in AsciiDoc into a narration-ready audio transcript suitable for text-to-speech (TTS) generation and professional e-learning delivery.
 
-    PRIMARY OBJECTIVE
-
+    PRIMARY OBJECTIVE: 
     Generate a spoken-word training transcript that preserves the educational intent, learning outcomes, procedures, concepts, warnings, and important details from the source content while sounding natural, engaging, and easy to listen to.
 
-    The output must be optimized for audio delivery rather than visual reading.
+    IMPORTANT: The generated transcript should stay as close as possible to the original content and meaning. Do not unnecessarily summarize, reorder, omit or alter the information. The primary goal is to make the material easier for a slow reader to follow while listening to the audio generated from the transcript.
 
     AUDIENCE
 
-    Assume the audience consists of learners consuming the content as narrated training material. They may not be viewing the original page while listening.
+    Assume the audience consists of learners consuming the content as narrated training material. They may or may not be viewing the original page while listening.
 
     VOICE AND STYLE
 
@@ -626,33 +625,35 @@ def init_transcript_prompts():
 
     Language requirements:
     - Detect the primary language of the source content.
-    - Generate the transcript in the same language as the source content by default.
-    - Do not translate content unless explicitly instructed.
-    - Preserve the original language of learning objectives, explanations, warnings, notes, and procedures.
-    - Maintain natural spoken style appropriate for the detected language.
-    - Use grammar, sentence structure, and conversational phrasing that sound natural to native speakers.
-    - Preserve product names, company names, feature names, commands, code, file names, configuration keys, API names, and other technical identifiers exactly as written.
-    - Preserve standard industry terminology when commonly used in its original form.
-    - If a page contains multiple languages, use the dominant instructional language for narration while preserving technical terms and proper nouns in their original form.
+    - Generate the transcript in the same language by default.
+    - Do not translate unless explicitly requested.
+    - Use grammar, sentence structure, and phrasing natural to that language.
+    - If multiple languages are present, use the dominant instructional language 
+    - while preserving technical terms and proper nouns in their original form.
     - Do not mix languages unnecessarily.
-    - Do not translate examples, commands, code snippets, configuration values, technical identifiers, filenames, API names, product names, or configuration keys unless explicitly instructed.
+
+    Preserve the following exactly as written unless explicitly instructed otherwise:
+    - Product and company names
+    - Feature names
+    - Commands and code
+    - File names
+    - Configuration keys and values
+    - API names
+    - Technical identifiers
+    - Standard industry terminology
 
     The transcript should sound as if it was originally authored in the source language rather than translated from another language.
 
     CONTENT PRESERVATION RULES
 
-    Preserve all:
+    Preserve all learning-critical information, including:
+
     - Learning objectives
-    - Key concepts
-    - Definitions
-    - Procedures
-    - Steps
+    - Key concepts and definitions
+    - Procedures and their sequence
     - Important explanations
-    - Warnings
-    - Cautions
-    - Notes
-    - Tips
-    - Best practices
+    - Warnings and cautions
+    - Notes, tips, and best practices
     - Examples
     - Critical technical information
 
@@ -894,24 +895,7 @@ def init_transcript_prompts():
     st.session_state.user_prompt_create_transcript = f"""
     Generate a professional e-learning voiceover transcript from the following AsciiDoc training page.
 
-    Requirements:
-
-    - Automatically detect the language of the training page.
-    - Generate the transcript in the same language as the source content.
-    - Do not translate unless explicitly requested.
-    - Preserve all important learning content.
-    - Expand terse bullets into natural conversational explanations.
-    - Preserve procedures, warnings, cautions, notes, tips, examples, and learning objectives.
-    - Do not read raw AsciiDoc syntax.
-    - Do not read formatting artifacts, anchors, attributes, IDs, roles, includes, or block markers.
-    - Summarize tables and diagrams into natural spoken explanations.
-    - Explain code examples rather than reading long code blocks line by line unless the exact syntax is essential for learning.
-    - Preserve commands, code, filenames, API names, product names, configuration values, and technical identifiers exactly as written.
-    - Use smooth transitions and professional trainer-style narration.
-    - Maintain a consistent instructional tone suitable for high-quality TTS.
-    - Return only the transcript text.
-
-    AsciiDoc Page Content:
+    Use the system instructions to determine how the content should be transformed for narration and TTS.
 
     <<<BEGIN_ASCIIDOC>>>
     {st.session_state.adoc_content}
