@@ -2,6 +2,30 @@ import streamlit as st
 import hashlib
 import os
 import shutil
+import gc
+
+
+def _teardown_chroma_system(persist_dir):
+    """Fully close and drop the cached chromadb System for persist_dir.
+
+    chromadb keeps a process-global registry (SharedSystemClient._identifier_to_system)
+    keyed by persist_directory, holding a live SQLite connection. Streamlit reruns and
+    every chat/query construct new Chroma clients that bump a refcount but never release
+    it, so the built-in refcounted _release_system() never actually stops the system.
+    We forcibly pop + stop it here. system.stop() runs RustBindingsAPI.stop() which does
+    `del self.bindings`, closing the underlying SQLite file handle. Without this, deleting
+    the directory and recreating leaves the old connection bound to the removed file,
+    producing SQLITE_READONLY_DBMOVED (code 1032) on the next write.
+    """
+    try:
+        from chromadb.api.shared_system_client import SharedSystemClient
+        system = SharedSystemClient._identifier_to_system.pop(persist_dir, None)
+        SharedSystemClient._identifier_to_refcount.pop(persist_dir, None)
+        if system is not None:
+            system.stop()
+    except Exception as e:
+        print(f"Warning: could not tear down chromadb system for {persist_dir}: {e}")
+    gc.collect()
 
 ##Use doclin instead of below
 from langchain_community.document_loaders import PyPDFLoader
@@ -167,12 +191,19 @@ def show_file_content_dialog(filepath):
 @st.dialog("Are you sure you want to clear all uploaded data? This can't be undone.")
 def clear_uploaded_content():
     if st.button("Yes"):
+        # Drop python-side references, then fully close the chromadb SQLite connection
+        # BEFORE deleting the rag_db directory. Must match the persist_directory string
+        # used in generate_rag_db exactly.
+        st.session_state.vectorstore = None
+        if hasattr(st.session_state, 'retriever'):
+            st.session_state.retriever = None
+        _teardown_chroma_system(f"{st.session_state.user_dir}/rag_db")
+
         for dir in ["uploads", "rag_db"]:
             dir_to_delete = os.path.join(st.session_state.user_dir, dir)
             files_to_delete = os.path.join(st.session_state.user_dir, f"uploads-hash.txt")
             os.remove(files_to_delete) if os.path.exists(files_to_delete) else None
 
-            # Delete hash file if exists
             if os.path.exists(dir_to_delete):
                 try:
                     shutil.rmtree(dir_to_delete)
@@ -233,43 +264,23 @@ def generate_rag_db(file_path):
     embeddings = get_embedding()
     persist_dir = f"{st.session_state.user_dir}/rag_db"
 
-    ## Create rag_db directory directory if it does not exists
-    if not os.path.exists(f"{persist_dir}"):
-        os.makedirs(f"{persist_dir}")
+    if not os.path.exists(persist_dir):
+        os.makedirs(persist_dir)
 
-    if os.path.exists(persist_dir):
-        # Load existing vectorstore and add new documents
+    db_file = os.path.join(persist_dir, "chroma.sqlite3")
+    print("Persist dir:", persist_dir)
+    print("Writable:", os.access(persist_dir, os.W_OK))
+    print("DB exists:", os.path.exists(db_file))
+
+    if os.path.exists(db_file):
+        print("DB writable:", os.access(db_file, os.W_OK))
         vectorstore = Chroma(persist_directory=persist_dir, embedding_function=embeddings)
-
-        print("Persist dir:", persist_dir)
-        print("Writable:", os.access(persist_dir, os.W_OK))
-
-        db_file = os.path.join(persist_dir, "chroma.sqlite3")
-        print("DB exists:", os.path.exists(db_file))
-
-        if os.path.exists(db_file):
-            print("DB writable:", os.access(db_file, os.W_OK))
-
-
         vectorstore.add_documents(final_splits)
-
-
-        vectorstore = Chroma(
-            persist_directory=persist_dir,
-            embedding_function=embeddings,
-        )
-
-        print(vectorstore._persist_directory)
-
-
     else:
-        # Create new vectorstore
-        if os.path.exists(persist_dir):
-            shutil.rmtree(persist_dir)
-
-        print(persist_dir)
-        print(os.access(persist_dir, os.W_OK))
-            
+        # No sqlite file on disk, but a cached chromadb System for this path may still be
+        # holding a connection to a since-deleted file. Tear it down so from_documents
+        # opens a fresh connection instead of reusing the stale (readonly-moved) one.
+        _teardown_chroma_system(persist_dir)
         print(f"Creating new RAG vectorstore at: {persist_dir}")
         vectorstore = Chroma.from_documents(documents=final_splits, embedding=embeddings, persist_directory=persist_dir)
 
