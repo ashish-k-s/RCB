@@ -2,11 +2,18 @@ site:
   title: {{ course_title }}
   start_page: {{ repo_name }}::index.adoc
 
+antora:
+  extensions:
+  - require: '@antora/lunr-extension'
+    index_latest_only: true
+
 content:
   sources:
   - url: ./
 
 asciidoc:
+  extensions:
+  - '@asciidoctor/tabs'
   attributes:
     page-pagination: true
 
