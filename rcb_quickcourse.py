@@ -180,6 +180,7 @@ def generate_antora_yml():
     env = Environment(loader=FileSystemLoader(st.session_state.antora_template_dir))
     template = env.get_template('antora.yml.j2')
     template_pb = env.get_template('antora-playbook.yml.j2')
+    template_hbs = env.get_template('header-content.hbs.j2')
     template_root_index = env.get_template('root-index.adoc.j2')
 
     print(f"DEBUG: antora_course_title before assignment: >>>>>>>>>> {st.session_state.antora_course_title}")
@@ -215,6 +216,10 @@ def generate_antora_yml():
     print(f"DEBUG: st.session_state.antora_course_title: >>>>>>>>>> {st.session_state.antora_course_title}")
     print(f"DEBUG: st.session_state.desc_chapters: >>>>>>>>>> {st.session_state.desc_chapters}")
 
+    rendered_hbs = template_hbs.render(repo_name=st.session_state.repo_name)
+
+    with open(st.session_state.antora_hbs_file, 'w') as f:
+        f.write(rendered_hbs)
 
     rendered_root_index = template_root_index.render(
         course_title=course_title_str,
