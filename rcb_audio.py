@@ -151,7 +151,7 @@ def generate_audio_file_from_transcript_gemini_tts():
     client = genai.Client(api_key=st.session_state.gemini_api_key)
     print(f"st.session_state.default_audio_file_path_txt: {st.session_state.default_audio_file_path_txt}")
     with open(st.session_state.default_audio_file_path_txt, "r") as f:
-        st.session_state.curated_transcript = f.read()
+        curated_transcript = f.read()
     init_audio_prompts()
     if st.session_state.voice_type_mf == "Female":
         response = client.models.generate_content(
@@ -205,7 +205,7 @@ def generate_audio_file_from_transcript_gemini_tts():
 
     result = subprocess.run(
         ["ffmpeg", "-y", "-i", st.session_state.default_audio_file_path_wav, st.session_state.default_audio_file_path_mp3],
-        input=st.session_state.curated_transcript,
+        input=curated_transcript,
         text=True,
         capture_output=True
     )
